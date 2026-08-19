@@ -1,0 +1,37 @@
+{
+  "protocol_id": "DEPURACION_MLB_V0_3_PROGRESSIVE",
+  "authority": "01 — CONSTITUCIÓN MAESTRA — @DepuracionMLB — V0.3",
+  "methodological_phases": {
+    "F1": "Universe, identity and pregame snapshot",
+    "F2": "Starter screening",
+    "F3": "Offense screening",
+    "F4": "Bullpen and functional context",
+    "F5": "Structural cross",
+    "F6": "Conditional discriminant resolution",
+    "F7": "Full-game viability",
+    "F8": "Materialization and symmetric countercase",
+    "F9": "Horizontal comparison, Red Team and false-negative rescue",
+    "F10": "Final shortlist and handoff"
+  },
+  "runtime_mapping": {
+    "F1": ["T0_UNIVERSE", "T1_IDENTITY_SNAPSHOT"],
+    "F2": ["T2_STARTER_DATA", "T2_STARTER_SCREEN"],
+    "F3": ["T3_OFFENSE_DATA", "T3_OFFENSE_SCREEN"],
+    "F4": ["T4_BULLPEN_CONTEXT_DATA", "T4_BULLPEN_CONTEXT_SCREEN"],
+    "F5": ["T5_STRUCTURAL_CROSS"],
+    "F6": ["T6_DISCRIMINANT_DATA", "T6_DISCRIMINANT_RESOLVE"],
+    "F7": ["T7_FULL_GAME_VIABILITY"],
+    "F8": ["T8_MATERIALIZATION_CHALLENGER"],
+    "F9": ["T9_RED_TEAM", "T9_GAME_FREEZE", "T10_HORIZONTAL_AUDIT"],
+    "F10": ["T11_HANDOFF_REPORT", "T11_VALIDATE"]
+  },
+  "depth_policy": ["STOP", "STANDARD", "DISCRIMINANT"],
+  "hard_truth_rules": [
+    "No narrated tool call counts as execution without physical trace.",
+    "No evidence without a tool event in the same run/game.",
+    "No live/post-first-pitch information may rewrite pregame truth.",
+    "No score or metric-vote system replaces causal reasoning.",
+    "No handoff unless the complete eligible universe has comparative closure.",
+    "No betting authority exists in this agent."
+  ]
+}
