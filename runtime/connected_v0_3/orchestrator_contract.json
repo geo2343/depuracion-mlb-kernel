@@ -1,0 +1,32 @@
+{
+  "name": "DEP_MLB_CONNECTED_AGENT_ORCHESTRATOR",
+  "version": "0.3",
+  "agent": "@DepuracionMLB",
+  "execution_owner": "AI_AGENT_ORCHESTRATOR",
+  "trigger": "any registered activation alias",
+  "on_trigger": [
+    "verify active authority and required connector state",
+    "create new Drive folder and exclusive run report",
+    "register dep_mlb_agent_invocations with FULL_AGENT + CLEAN_ROOM",
+    "create dep_mlb_runs bound to invocation_id",
+    "execute F1-F10 automatically without manual phase authorization",
+    "use AI reasoning for sports semantics and causal comparison",
+    "persist each phase output in dep_mlb_phase_artifacts",
+    "ask Kernel to transition phase state only after physical artifacts exist",
+    "trace all material research as tool events and evidence",
+    "freeze packets, derive process audits, verify Drive readback",
+    "validate handoff in Supabase",
+    "report success only after F10 PASS"
+  ],
+  "forbidden_shortcuts": [
+    "answering with a summary of a prior run instead of executing",
+    "manual assistant sports analysis outside the agent state machine",
+    "reusing prior-run candidates, claims, packets or evidence",
+    "declaring a phase complete from prose alone",
+    "metric-vote or additive-score replacement of AI reasoning",
+    "self-authored PASS without Kernel state",
+    "closing with less than 100% comparative coverage"
+  ],
+  "blocker_behavior": "attempt recoverable work autonomously; if still blocked, persist blocker and stop with DEPURATION_INCOMPLETE — NO HANDOFF",
+  "betting_authority": false
+}
