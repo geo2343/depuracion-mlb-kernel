@@ -1,0 +1,34 @@
+{
+  "agent_id": "@DepuracionMLB",
+  "agent_version": "DEP-MLB-AGENT-1.0",
+  "kernel_version": "DEP-MLB-KERNEL-0.2-CONNECTED",
+  "protocol_id": "DEPURACION_MLB_V0_3_PROGRESSIVE",
+  "mother_document_sha256": "e5b8272192faf2b06526066ded66fb131ea21a33cc30baee7a127c0e2ff18482",
+  "mother_revision_state": "V0.3 methodology + CONNECTED_AGENT_MIGRATION_NOTICE V0.2",
+  "mandate_drive_id": "1ML5TWbb1uNGbjFj52FlaEUV14Qai_iwp8qs3OOB_d4Q",
+  "status_drive_id": "1rIVa0hmEq2enoux227v7eoY48gY9Az0fCHzFNPQ_hlA",
+  "connected_runtime_drive_folder_id": "11YDWJAfQ_XJk5yT1t2fvvWB80KU-wr-n",
+  "controlled_validation": {
+    "run_id": "TEST-DEP-V02",
+    "result": "FULL_INFRA_CHAIN_PASS",
+    "sports_analysis": false
+  },
+  "enforcement": {
+    "same_run_game_lineage": true,
+    "verified_connector_required_for_tool_event": true,
+    "post_first_pitch_sports_evidence_forbidden": true,
+    "drive_readback_and_hash_required_for_freeze": true,
+    "frozen_packet_immutable": true,
+    "audit_required": true,
+    "full_universe_comparative_coverage_required_for_handoff": true,
+    "drive_readback_required_for_handoff": true,
+    "rls_enabled": true,
+    "function_search_path_hardened": true
+  },
+  "standalone_http": {
+    "vercel_project_visible": false,
+    "kernel_endpoint_policy": "FAIL_CLOSED_NO_FAKE_EVIDENCE",
+    "production_ready": false
+  },
+  "real_money_authority": false
+}
