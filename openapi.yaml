@@ -1,27 +1,20 @@
 openapi: 3.1.0
 info:
   title: DepuracionMLB Kernel
-  version: 0.1.0
+  version: 0.2.0
+  description: Connected @DepuracionMLB control-plane metadata. Standalone sports execution remains fail-closed until a real MLB bridge and Vercel deployment are verified.
 servers:
-  - url: https://REPLACE-WITH-VERCEL-DOMAIN
+  - url: https://REPLACE-WITH-VERIFIED-VERCEL-DOMAIN
 paths:
   /api/health:
     get:
       operationId: kernelHealth
       responses:
         '200':
-          description: Kernel health
+          description: Truthful connected-agent health metadata
   /api/kernel:
     get:
       operationId: executeKernelTask
-      parameters:
-        - in: query
-          name: task
-          required: true
-          schema:
-            type: string
       responses:
-        '200':
-          description: Task accepted
-        '409':
-          description: Task rejected by Kernel
+        '503':
+          description: Standalone MLB bridge not ready; no evidence is fabricated
