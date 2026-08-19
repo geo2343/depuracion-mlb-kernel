@@ -10,7 +10,8 @@
     "canonical_mother_document": {
       "title": "01 — CONSTITUCIÓN MAESTRA — @DepuracionMLB — V0.3",
       "drive_id": "1nod0j35fZeILy7fxUk5IPCT7_qn3f0sEFsxmLbDdfrA",
-      "verified_plain_text_export_sha256": "b258d6b43348cd3a1cba8ba515e6512a91cc3eb80d5447bd5d80c56a6fec835d"
+      "verified_plain_text_export_sha256": "e5b8272192faf2b06526066ded66fb131ea21a33cc30baee7a127c0e2ff18482",
+      "revision_state": "V0.3 methodology + CONNECTED_AGENT_MIGRATION_NOTICE V0.2"
     },
     "uploaded_document": {
       "sha256": "855236ea11082458da8e1ca7e05ac446070a107bee45f51abdd0866279dc7a00",
@@ -55,7 +56,9 @@
     "authority_folder_id": "1A0wV2KYzHuw541ndGF73Gt-hdTmUJztN",
     "active_run_folder_id": "1dniT0sZmGgLmp0m-aBqvfCMhZq-Ylqhx",
     "closed_run_folder_id": "1Pz8QLy1pypbDKmT0VEd8A_e2mYli7j_1",
-    "legacy_runtime_folder_id": "11GdVFCMCHwxaU5CrIqE_4I6WVumGQa30"
+    "legacy_runtime_folder_id": "11GdVFCMCHwxaU5CrIqE_4I6WVumGQa30",
+    "connected_runtime_folder_id": "11YDWJAfQ_XJk5yT1t2fvvWB80KU-wr-n",
+    "connected_status_document_id": "1rIVa0hmEq2enoux227v7eoY48gY9Az0fCHzFNPQ_hlA"
   },
   "run_policy": {
     "manual_phase_authorization_required": false,
