@@ -1,0 +1,31 @@
+{
+  "protocol_id": "DEPURACION_MLB_V0_3_PROGRESSIVE",
+  "runtime_profile": "DEP-MLB-KERNEL-0.3-AUTONOMOUS",
+  "agent_version": "DEP-MLB-AGENT-1.1",
+  "authority": "01 — CONSTITUCIÓN MAESTRA — @DepuracionMLB — V0.3",
+  "invocation_contract": {
+    "aliases_activate_full_execution": true,
+    "manual_assistant_substitute_forbidden": true,
+    "fresh_run_required": true,
+    "fresh_drive_artifact_required_before_sports_analysis": true,
+    "fresh_web_research_required": true,
+    "historical_sports_content_role": "AUDIT_ONLY",
+    "terminal_condition": "F10_PASS_OR_EXPLICIT_PHYSICAL_BLOCKER"
+  },
+  "phase_machine": [
+    {"phase":"F0","owner":"KERNEL","purpose":"bind alias invocation, clean-room identity, new Drive dossier and run"},
+    {"phase":"F1","owner":"AI_AGENT","purpose":"real MLB universe, identity and snapshot","kernel_gate":"frozen universe + report exists"},
+    {"phase":"F2","owner":"AI_AGENT","purpose":"starter screening for every eligible game","kernel_gate":"game artifact coverage = 100%"},
+    {"phase":"F3","owner":"AI_AGENT","purpose":"offense screening for every eligible game","kernel_gate":"game artifact coverage = 100%"},
+    {"phase":"F4","owner":"AI_AGENT","purpose":"bullpen/context screening for every eligible game","kernel_gate":"game artifact coverage = 100%"},
+    {"phase":"F5","owner":"AI_AGENT","purpose":"structural cross and progressive-depth decision","kernel_gate":"game artifact coverage = 100%"},
+    {"phase":"F6","owner":"AI_AGENT","purpose":"resolve discriminants where material; record explicit no-depth rationale elsewhere","kernel_gate":"game artifact coverage = 100%"},
+    {"phase":"F7","owner":"AI_AGENT","purpose":"full-game viability","kernel_gate":"game artifact coverage = 100%"},
+    {"phase":"F8","owner":"AI_AGENT","purpose":"materialization and symmetric countercase","kernel_gate":"game artifact coverage = 100%"},
+    {"phase":"F9","owner":"AI_AGENT","purpose":"Red Team, false-positive/false-negative rescue and horizontal comparison","kernel_gate":"game Red Team coverage = 100% + slate horizontal audit"},
+    {"phase":"F10","owner":"AI_AGENT","purpose":"shortlist, best excluded and handoff","kernel_gate":"all packets frozen + audits PASS + verified Drive handoff + database validation PASS"}
+  ],
+  "sports_reasoning_rule": "AI_AGENT decides semantic relevance, mechanisms, causal materialization, countercases and comparative priority. Kernel checks process only and may never convert metrics into a sports vote.",
+  "evidence_rule": "tool_event -> evidence -> phase_artifact/claim -> packet must remain inside the same run and game.",
+  "completion_truth": "Text saying executed, analyzed or complete has zero authority unless the phase state machine and physical artifacts support it."
+}
