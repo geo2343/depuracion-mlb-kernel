@@ -1,0 +1,19 @@
+{
+  "runtime": "@DepuracionMLB V0.1 audited baseline",
+  "status": "IMMUTABLE_REGRESSION_REFERENCE",
+  "drive_folder_id": "11GdVFCMCHwxaU5CrIqE_4I6WVumGQa30",
+  "drive_zip_id": "1jkR5vWAzfAYhp2US_ZmXtysPb9oO1I22",
+  "verification_2026_08_19": {
+    "pytest": "70/70 PASS",
+    "randomized_stress": "500/500 PASS",
+    "compileall": "PASS"
+  },
+  "sha256": {
+    "kernel.py": "8b2d429aa4c8efef3984b1c9f09368ec2b0cf8be83e458c329ffa89d313487d2",
+    "validators.py": "960537cc2d1a89b9a64cb2eacd2041ab1a3479bed6e1d7d0b6b716978c0e1592",
+    "workflow.py": "c03a4748a6e756879177c48e9c4276eac68d8ad15448d36b10b8841bdb967098",
+    "tests/test_runtime.py": "4a7880a28a8f234406f78b60b99eb9a36fcf6a2210c04a2583244299cae65161",
+    "stress_audit.py": "e4c90a30b9e5cc3a099fa57e59739c24b45ac60ece018d0bbe40755cabd1b1d0"
+  },
+  "note": "V0.1 proves control-plane invariants with simulated tools/LLM. It is not a real MLB production certification."
+}
