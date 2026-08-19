@@ -1,32 +1,13 @@
-import crypto from 'crypto';
-
-const FLOW = ['T1_IDENTITY', 'T2_STARTER_SCREEN', 'T3_OFFENSE_SCREEN'];
-
 export default async function handler(req, res) {
-  const task = String(req.query.task || '');
-  const expected = FLOW[0];
-
-  if (task !== expected) {
-    return res.status(409).json({
-      accepted: false,
-      error: 'TASK_NOT_AUTHORIZED',
-      expected,
-      received: task
-    });
-  }
-
-  const evidence_id = 'EV-' + crypto
-    .createHash('sha256')
-    .update(`${task}|${Date.now()}|${crypto.randomUUID()}`)
-    .digest('hex')
-    .slice(0, 12)
-    .toUpperCase();
-
-  return res.status(200).json({
-    accepted: true,
-    task,
-    evidence_id,
-    generated_by: 'external_kernel',
-    note: 'Demo control endpoint. MLB source integration not yet enabled.'
+  return res.status(503).json({
+    accepted: false,
+    service: 'DepuracionMLB-Kernel',
+    version: '0.2.0',
+    agent: '@DepuracionMLB',
+    error: 'STANDALONE_MLB_BRIDGE_NOT_READY',
+    detail: 'This HTTP endpoint must not fabricate evidence. Connected execution currently uses verified ChatGPT connectors plus Supabase/Drive lineage. Enable this endpoint only after a real MLB source bridge and deployment are physically verified.',
+    evidence_generated: false,
+    vercel_deployment_verified: false,
+    real_money_authority: false
   });
 }
