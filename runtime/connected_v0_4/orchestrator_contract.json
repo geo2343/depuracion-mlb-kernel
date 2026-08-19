@@ -1,0 +1,43 @@
+{
+  "name": "DEP_MLB_CONNECTED_AGENT_ORCHESTRATOR",
+  "version": "0.4",
+  "agent": "@DepuracionMLB",
+  "agent_version": "DEP-MLB-AGENT-1.2",
+  "kernel_version": "DEP-MLB-KERNEL-0.4-AUTONOMOUS-REFACTOR",
+  "execution_owner": "AI_AGENT_ORCHESTRATOR",
+  "trigger": "any registered activation alias",
+  "on_trigger": [
+    "verify active Mother hash/version and required connector state",
+    "create new exclusive Drive folder/report and physically read it back",
+    "persist the Drive verification as an invocation connector event and receipt",
+    "register FULL_AGENT CLEAN_ROOM invocation",
+    "create a new run bound to invocation_id and AI_AGENT_ORCHESTRATOR",
+    "execute F1-F5 on the full universe",
+    "execute F6 only on F5 DISCRIMINANT games",
+    "execute F7-F8 only on survivors",
+    "return to all eligible games in F9 for Red Team, false-negative rescue and horizontal audit",
+    "freeze event-attested game packets and derive DATABASE_CONTROL_V04 audits",
+    "prepare typed handoff, event-attested RUN_DOSSIER/HANDOFF_REPORT and convergent MLB_CHAT_REPORT_STANDARD_R1",
+    "validate DELIVERY_STATUS COMPLETE",
+    "mark F10 PASS and automatically close the run/invocation"
+  ],
+  "reopen_policy": {
+    "pre_f9": "fresh same-run Web material change can selectively reopen the owner phase and downstream states; superseded artifacts remain immutable history",
+    "post_f9": "new material sports information requires a new clean-room run"
+  },
+  "forbidden_shortcuts": [
+    "status-only response instead of execution",
+    "manual assistant analysis outside the agent state machine",
+    "reuse of prior-run sports evidence, candidates, claims or packets",
+    "equal-depth research imposed on STOP games",
+    "F6 on a non-DISCRIMINANT game",
+    "F7/F8 on a non-survivor",
+    "sports evidence without fresh Web lineage and source as_of",
+    "caller-authored hashes or process-audit PASS",
+    "Drive verification without a linked Drive tool event",
+    "F10 without RUN_DOSSIER + HANDOFF_REPORT + CHAT R1 + all audited packets",
+    "post-F9 sports rewrite of a terminal run",
+    "metric voting replacing AI causal judgment"
+  ],
+  "betting_authority": false
+}
