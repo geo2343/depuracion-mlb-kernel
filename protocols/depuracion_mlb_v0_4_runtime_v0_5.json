@@ -1,0 +1,53 @@
+{
+  "protocol_id": "DEPURACION_MLB_V0_4_EXHAUSTIVE_SELECTIVE",
+  "system_id": "DEP-MLB-V0.4",
+  "agent_version": "DEP-MLB-AGENT-1.3",
+  "kernel_version": "DEP-MLB-KERNEL-0.5-EXHAUSTIVE-SELECTIVE",
+  "object": "MLB FULL GAME UNDER — PREGAME depuration",
+  "authority_of_bet": false,
+  "mission": "Compare the complete eligible slate under equal minimum causal burden and pass at most two games to downstream deep investigation.",
+  "phases": {
+    "F1": {"scope":"SLATE","output":"DAILY_MLB_UNIVERSE + DATA_DEPENDENCY_MAP"},
+    "F2": {"scope":"ALL_ELIGIBLE_GAMES","output":"STARTER_SCREEN"},
+    "F3": {"scope":"ALL_ELIGIBLE_GAMES","output":"OFFENSE_SCREEN"},
+    "F4": {"scope":"ALL_ELIGIBLE_GAMES","output":"BULLPEN_CONTEXT_SCREEN","dedicated_source_family":"BULLPEN_CONTEXT"},
+    "F5": {"scope":"ALL_ELIGIBLE_GAMES","output":"STRUCTURAL_CROSS","required_depth_decision":"EXHAUSTIVE","required_next_state":"CONTINUE"},
+    "F6": {"scope":"ALL_ELIGIBLE_GAMES","output":"DISCRIMINANT_RESOLUTION","dedicated_source_family":"DEEP_VERIFICATION","mandatory":true},
+    "F7": {"scope":"ALL_ELIGIBLE_GAMES","output":"FULL_GAME_VIABILITY"},
+    "F8": {"scope":"ALL_ELIGIBLE_GAMES","output":"MATERIALIZATION_COUNTERCASE"},
+    "F9": {"scope":"ALL_ELIGIBLE_GAMES_PLUS_HORIZONTAL_AUDIT","output":"RED_TEAM_RESULT + HORIZONTAL_AUDIT"},
+    "F10": {"scope":"DELIVERY","output":"MAX_2_PRIMARY + DEPURATION_HANDOFF_PACKET + CHAT_R1"}
+  },
+  "minimum_game_evidence": {
+    "sports_evidence": 4,
+    "source_families": 4,
+    "source_origins": 2,
+    "required_families": ["STARTER_PROFILE","OFFENSE_PROFILE","BULLPEN_CONTEXT","DEEP_VERIFICATION"],
+    "required_claim_types": ["FAVORABLE_MECHANISM","ADVERSE_ROUTE","FULL_GAME_SYNTHESIS"]
+  },
+  "candidate_admission": {
+    "max_total": 2,
+    "candidate_class": "PRIMARY_CANDIDATE",
+    "potential_enabled": false,
+    "f8_full_game_chain": "COMPLETE",
+    "independent_containment_mechanisms_min": 2,
+    "governing_failure_route_required": true,
+    "f9_candidate_gate": "PASS",
+    "f9_red_team": "SURVIVES",
+    "f9_comparative_verdict": "TOP_TWO"
+  },
+  "terminal_time_rule": {
+    "deadline": "EARLIEST_FIRST_PITCH",
+    "must_finish_before_deadline": ["F1","F2","F3","F4","F5","F6","F7","F8","F9","PACKET_FREEZE","PROCESS_AUDIT","HANDOFF","CHAT_R1","F10"],
+    "missed_deadline": "DEPURATION_INCOMPLETE — NO HANDOFF"
+  },
+  "doctrine": [
+    "AI interprets sports meaning; Kernel enforces process.",
+    "UNKNOWN is neither automatic risk nor automatic support.",
+    "One favorable fact cannot promote a game.",
+    "One adverse fact cannot reject a game before full F2-F9 burden.",
+    "Same mechanism repeated across metrics does not create independent votes.",
+    "False-positive and false-negative review are symmetric.",
+    "Zero, one or two candidates are valid; quota filling is forbidden."
+  ]
+}
