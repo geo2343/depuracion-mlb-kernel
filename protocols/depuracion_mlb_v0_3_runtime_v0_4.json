@@ -1,0 +1,63 @@
+{
+  "protocol_id": "DEPURACION_MLB_V0_3_PROGRESSIVE",
+  "methodological_authority": "01 — CONSTITUCIÓN MAESTRA — @DepuracionMLB — V0.3",
+  "operational_notice": "AUTONOMOUS_REFACTOR_NOTICE V0.4 ACTIVE",
+  "agent_version": "DEP-MLB-AGENT-1.2",
+  "kernel_version": "DEP-MLB-KERNEL-0.4-AUTONOMOUS-REFACTOR",
+  "methodological_phases": {
+    "F1": "Universe, identity and pregame snapshot",
+    "F2": "Starter screening",
+    "F3": "Offense screening",
+    "F4": "Bullpen and functional context",
+    "F5": "Structural cross",
+    "F6": "Conditional discriminant resolution",
+    "F7": "Full-game viability for survivors",
+    "F8": "Materialization and symmetric countercase for survivors",
+    "F9": "Full-universe Red Team, false-negative rescue and horizontal comparison",
+    "F10": "Final typed shortlist, Drive handoff, CHAT R1 and delivery validation"
+  },
+  "targeting": {
+    "F1": "SLATE",
+    "F2": "ALL_ELIGIBLE_GAMES",
+    "F3": "ALL_ELIGIBLE_GAMES",
+    "F4": "ALL_ELIGIBLE_GAMES",
+    "F5": "ALL_ELIGIBLE_GAMES",
+    "F6": "F5_NEXT_STATE_EQUALS_DISCRIMINANT",
+    "F7": "SURVIVORS_ONLY",
+    "F8": "SURVIVORS_ONLY",
+    "F9": "ALL_ELIGIBLE_GAMES_PLUS_SLATE_AUDIT",
+    "F10": "TERMINAL_DELIVERY"
+  },
+  "f5_states": ["STOP", "SURVIVE", "DISCRIMINANT"],
+  "f6_resolved_states": ["STOP", "SURVIVE"],
+  "reopen_mapping": {
+    "IDENTITY_CHANGE": "F1",
+    "STARTER_CHANGE": "F2",
+    "LINEUP_MATERIAL_CHANGE": "F3",
+    "BULLPEN_CONTEXT_CHANGE": "F4",
+    "DISCRIMINANT_UPDATE": "F6",
+    "FULL_GAME_TRANSITION_CHANGE": "F7"
+  },
+  "terminal_delivery": {
+    "requires_universe_comparative_coverage": "100%",
+    "requires_audited_packet_per_game": true,
+    "requires_event_attested_run_dossier": true,
+    "requires_event_attested_handoff_report": true,
+    "requires_typed_candidate_payload": true,
+    "requires_chat_standard": "MLB_CHAT_REPORT_STANDARD_R1",
+    "requires_drive_report_complete": "PASS",
+    "requires_chat_report_complete": "PASS",
+    "requires_delivery_status": "COMPLETE"
+  },
+  "hard_truth_rules": [
+    "Comparative coverage never implies equal research depth.",
+    "AI_AGENT owns sports semantics; Kernel owns enforcement only.",
+    "No sports evidence without a fresh same-run Web tool event and source URL/origin/as_of.",
+    "No phase PASS without targeted physical artifact coverage and DB-derived completion hash.",
+    "No post-F9 Web sports research in the same run; use a fresh clean-room run.",
+    "No caller-authored process audit status or terminal packet hash.",
+    "No Drive readback without a linked Google Drive tool event.",
+    "No F10 without complete Drive + Chat delivery QA.",
+    "No betting authority exists in this agent."
+  ]
+}
