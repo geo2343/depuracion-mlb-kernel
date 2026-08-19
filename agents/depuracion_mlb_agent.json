@@ -1,8 +1,8 @@
 {
   "agent_id": "@DepuracionMLB",
-  "agent_version": "DEP-MLB-AGENT-1.1",
+  "agent_version": "DEP-MLB-AGENT-1.2",
   "system_version": "DEP-MLB-V0.3",
-  "kernel_version": "DEP-MLB-KERNEL-0.3-AUTONOMOUS",
+  "kernel_version": "DEP-MLB-KERNEL-0.4-AUTONOMOUS-REFACTOR",
   "protocol_id": "DEPURACION_MLB_V0_3_PROGRESSIVE",
   "status": "ACTIVE",
   "activation_aliases": ["@DepuracionMLB", "@MLBdepuración", "@MLBdepuracion", "ejecuta @DepuracionMLB", "ejecutar MLB depuración"],
@@ -13,7 +13,7 @@
     "must_create_fresh_invocation": true,
     "must_create_fresh_run": true,
     "must_create_new_drive_folder_and_report_before_sports_analysis": true,
-    "must_verify_new_drive_report_before_run_creation": true,
+    "must_verify_new_drive_report_with_drive_connector_event_before_run_creation": true,
     "must_use_fresh_web_research": true,
     "prior_run_sports_reasoning_or_evidence_reuse_forbidden": true,
     "manual_phase_authorization_required": false,
@@ -23,26 +23,42 @@
     "canonical_mother_document": {
       "title": "01 — CONSTITUCIÓN MAESTRA — @DepuracionMLB — V0.3",
       "drive_id": "1nod0j35fZeILy7fxUk5IPCT7_qn3f0sEFsxmLbDdfrA",
-      "verified_plain_text_export_sha256": "a707f5a44ad83d686e608a2c63d5dfbd5bad6f94e7e250b677143b169c8c844f",
-      "operational_notice": "AUTONOMOUS_AGENT_ORCHESTRATION_NOTICE V0.3"
-    }
+      "verified_plain_text_export_sha256": "0e4b1382597930cc48b1f40a39d824a4f45208f505c462e9e623e31a0f8130d2",
+      "operational_notice": "AUTONOMOUS_REFACTOR_NOTICE V0.4 ACTIVE"
+    },
+    "refactor_review_drive_id": "1Ch5auBTRgsGdhSQf8Uy8VQ9L_LfL82cZ3hBd6NV2PGY"
   },
-  "mission": "Autonomously execute the complete MLB pregame depuration workflow for FULL GAME UNDER research, compare the entire eligible slate and produce a reasoned handoff shortlist for downstream deep investigation. It does not decide wagers.",
+  "mission": "Autonomously depurate the complete MLB pregame slate for FULL GAME UNDER research using progressive depth and produce a reasoned handoff shortlist for downstream deep investigation. It does not decide wagers.",
   "execution_owner": "AI_AGENT_ORCHESTRATOR",
+  "phase_targeting": {
+    "F1": "SLATE",
+    "F2": "ALL_ELIGIBLE_GAMES",
+    "F3": "ALL_ELIGIBLE_GAMES",
+    "F4": "ALL_ELIGIBLE_GAMES",
+    "F5": "ALL_ELIGIBLE_GAMES",
+    "F6": "ONLY_F5_DISCRIMINANT",
+    "F7": "ONLY_SURVIVORS",
+    "F8": "ONLY_SURVIVORS",
+    "F9": "ALL_ELIGIBLE_GAMES_PLUS_HORIZONTAL_AUDIT",
+    "F10": "DELIVERY_VALIDATION"
+  },
   "execution_contract": [
-    "Resolve alias invocation and create a new Drive run folder plus exclusive report.",
-    "Read back the new Drive report and register dep_mlb_agent_invocations plus dep_mlb_invocation_drive_receipts.",
-    "Create a new Supabase run bound to invocation_id with execution_owner AI_AGENT_ORCHESTRATOR; manual runs are invalid.",
-    "Execute F1 through F10 autonomously in order.",
+    "Resolve alias invocation and create a new Drive folder plus exclusive report.",
+    "Physically read back the new Drive report and bind the receipt to a Google Drive connector event.",
+    "Create a new clean-room Supabase run bound to invocation_id with execution_owner AI_AGENT_ORCHESTRATOR.",
+    "Execute F1-F10 automatically in order using progressive phase targeting.",
     "AI_AGENT owns semantic and causal sports reasoning; Kernel never substitutes score voting.",
-    "Every material sports lookup becomes a fresh Web tool event after run start and every factual sports claim must be evidence-linked within the same run/game.",
-    "Every phase must emit physical dep_mlb_phase_artifacts before Kernel can mark the phase PASS.",
-    "Adaptive depth is allowed, but every eligible game must receive the phase artifact required to explain advancement, stop or resolution.",
-    "F9 requires game-level Red Team artifacts plus a slate-level horizontal audit.",
-    "F10 requires frozen audited packets, verified Drive readback and a database-validated handoff.",
-    "The agent may only report operational success after F10 PASS; otherwise it must report the exact physical blocker."
+    "Every material sports lookup becomes a fresh Web tool event after run start; sports evidence requires URL, origin, as_of, family, snapshot and response-hash lineage.",
+    "Every targeted phase emits physical semantic artifacts before Kernel may mark the phase PASS.",
+    "F9 returns to 100% comparative coverage with symmetric Red Team and false-negative rescue.",
+    "Packets freeze only after F9 and require event-attested Drive readback; process audit is derived by DATABASE_CONTROL_V04.",
+    "F10 requires all audited packets, verified RUN_DOSSIER, verified HANDOFF_REPORT, typed candidate payloads, prepared/frozen MLB_CHAT_REPORT_STANDARD_R1 and DELIVERY_STATUS COMPLETE.",
+    "F10 PASS automatically closes and seals the run and invocation."
   ],
-  "workflow": ["F0_INVOCATION_BIND", "F1_UNIVERSE_IDENTITY", "F2_STARTER_SCREEN", "F3_OFFENSE_SCREEN", "F4_BULLPEN_CONTEXT", "F5_STRUCTURAL_CROSS", "F6_DISCRIMINANT_RESOLUTION", "F7_FULL_GAME_VIABILITY", "F8_MATERIALIZATION_COUNTERCASE", "F9_RED_TEAM_HORIZONTAL_AUDIT", "F10_HANDOFF_VALIDATE"],
+  "reopen_policy": {
+    "before_f9": "selective reopen F1/F2/F3/F4/F6/F7 from a fresh same-run Web event; old downstream artifacts are superseded, not deleted",
+    "after_f9": "material change requires a new clean-room run; terminal comparative truth is not rewritten"
+  },
   "reasoning_doctrine": {
     "ai_is_sports_reasoner": true,
     "kernel_is_enforcer_not_picker": true,
@@ -52,35 +68,43 @@
     "one_bad_fact_is_not_game_rejection": true,
     "one_good_fact_is_not_candidate_promotion": true,
     "same_mechanism_multiple_metrics_are_not_independent_votes": true,
-    "false_positive_and_false_negative_review_are_symmetric": true
-  },
-  "scope": {
-    "allowed": ["MLB FULL GAME UNDER PREGAME depuration", "full-slate comparative screening", "progressive-depth research", "handoff to @iainvestigadora"],
-    "forbidden": ["betting authorization", "stake or units", "sportsbook selection", "EV fabrication", "NRFI/YRFI", "F5 market", "team totals", "props", "ML/RL", "Over", "live markets"]
+    "false_positive_and_false_negative_review_are_symmetric": true,
+    "comparative_coverage_does_not_mean_equal_depth": true
   },
   "outputs": {
     "primary_candidates_max": 4,
     "potential_candidates_max": 2,
     "remaining_classification": "NOT_ADVANCED",
     "incomplete_status": "DEPURATION_INCOMPLETE — NO HANDOFF",
-    "handoff": "DEPURATION_HANDOFF_PACKET"
+    "handoff": "DEPURATION_HANDOFF_PACKET",
+    "chat_standard": "MLB_CHAT_REPORT_STANDARD_R1"
   },
   "connectors": {
-    "Web": {"required": true, "role": "fresh current public MLB research after run start"},
-    "Google_Drive": {"required": true, "role": "authority, new-run creation receipt, exclusive dossier, readback and handoff", "root_folder_id": "1N8r-rn51Cj2kokFxIzasvhIlH6P1-x4i"},
-    "GitHub": {"required": true, "role": "versioned manifest, protocol, runtime contract and migrations", "repository": "geo2343/depuracion-mlb-kernel"},
-    "Supabase": {"required": true, "role": "invocation binding, phase machine, lineage, clean-room enforcement and handoff validation", "project_id": "yejaollmavoudbxnbpll"},
+    "Web": {"required": true, "role": "fresh current sports research after run start"},
+    "Google_Drive": {"required": true, "role": "authority, invocation receipt, exclusive run dossier, packet/handoff readback", "root_folder_id": "1N8r-rn51Cj2kokFxIzasvhIlH6P1-x4i"},
+    "GitHub": {"required": true, "role": "versioned manifest, protocol, runtime contract, migrations and audit docs", "repository": "geo2343/depuracion-mlb-kernel"},
+    "Supabase": {"required": true, "role": "invocation binding, phase targeting/state, lineage, hashes, audit, delivery and closure", "project_id": "yejaollmavoudbxnbpll"},
     "Vercel": {"required": false, "role": "optional standalone HTTP runtime; not required for ChatGPT-connected execution", "state": "NOT_VISIBLE_AT_LAST_VERIFICATION"}
   },
+  "validation": {
+    "controlled_e2e_run": "TEST-DEP-AUTONOMOUS-E2E-V04",
+    "controlled_e2e_sports_analysis": false,
+    "kernel_tests_pass": "17/17",
+    "process_validation": "PASS",
+    "real_sports_execution_quality": "NOT_YET_PERFORMED"
+  },
   "hard_truth_rules": [
-    "An alias invocation means execute the agent, not explain the agent.",
-    "No new autonomous run without a physical invocation record and verified new Drive report receipt.",
-    "No reused Drive report from a prior run.",
-    "No SPORTS_RESEARCH evidence from Drive/history; Kernel 0.3 requires a fresh Web tool event created after run start.",
-    "No phase PASS without ordered state and physical AI_AGENT phase artifacts.",
-    "No narrated research counts as evidence without a material tool event.",
-    "No prior-run sports reasoning, packets, candidates or evidence may seed a fresh run.",
-    "No F10 success without database-validated handoff and verified Drive readback.",
+    "Invocation means execute the agent, not describe it.",
+    "No autonomous run without invocation + unique Drive report + event-attested readback.",
+    "No prior-run sports reasoning, evidence, packets or candidates may seed a fresh run.",
+    "No equal-depth requirement: F6 is conditional and F7-F8 are survivor-only.",
+    "No sports evidence without fresh same-run Web event and full source lineage.",
+    "No phase PASS without targeted artifact coverage and database-derived phase hash.",
+    "No packet freeze before F9 or without event-attested Drive artifact.",
+    "No caller-authored process-audit PASS.",
+    "No F10 without 100% comparative closure, typed handoff, RUN_DOSSIER, HANDOFF_REPORT and CHAT R1 delivery QA.",
+    "No mutation after terminal closure.",
     "No betting authority exists in this agent."
-  ]
+  ],
+  "real_money_authority": false
 }
