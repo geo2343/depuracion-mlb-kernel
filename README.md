@@ -51,9 +51,13 @@ Metrics are not votes and the Kernel does not make the sports pick.
 - F9: Red Team + false-negative rescue + horizontal audit
 - F10: shortlist + handoff validation
 
-F2-F9 cannot PASS from prose alone. The AI must persist the phase-specific semantic artifact for every eligible game. The Kernel checks presence, required semantic fields, evidence lineage and hash integrity; it does not decide whether the sports conclusion is favorable or adverse.
+F2-F9 cannot PASS from prose alone. The AI must persist the exact phase-specific semantic artifact for every eligible game. The Kernel checks presence, required semantic fields, evidence lineage, non-thin reasoning and hash integrity; it does not decide whether the sports conclusion is favorable or adverse.
 
 F10 PASS requires one frozen audited packet per eligible game plus a verified Drive handoff. F10 PASS automatically closes the run and invocation. Manual `COMPLETED` before F10 is rejected.
+
+## Database-derived audit
+
+For Agent 1.1 / Kernel 0.3, `dep_mlb_process_audits.audit_status` is derived by `DATABASE_CONTROL`. Caller-supplied PASS/FAIL has no authority. The database recomputes the audit from tool events, evidence, claims, required F2-F9 game artifacts, F0-F9 phase PASS state, packet freeze/hash and verified Drive readback, then synchronizes the result to the packet.
 
 ## Fresh evidence rule
 
@@ -71,4 +75,6 @@ For Agent 1.1 / Kernel 0.3, `SPORTS_RESEARCH` evidence must originate from a **f
 
 The former run `DEP-MLB-20260820-REAL-1557A` was reclassified `AUDIT_ONLY` because it was manually executed by the assistant under Agent 1.0 / Kernel 0.2. It does **not** certify the autonomous Agent 1.1 / Kernel 0.3.
 
-Kernel 0.3 has passed controlled adversarial tests for: run without invocation, manual execution owner, phase skipping, F1 without frozen universe, phase PASS without artifact coverage, reused prior Drive report, run without new-report receipt, historical Drive material as SPORTS_RESEARCH, manual close before F10 and empty/template phase artifacts. A full autonomous sports run should be used to certify end-to-end sports execution quality; infrastructure/process truth and sports quality remain separate.
+Kernel 0.3 has 15 controlled tests persisted in Supabase. The controlled autonomous run `TEST-DEP-AUTONOMOUS-E2E-V03` completed F0→F10, produced phase artifacts, froze a packet, received a database-derived process audit PASS, validated a Drive-backed handoff and automatically closed both the run and invocation. Its Drive audit receipt is `17PhvlEpDySVTtlPFo9ANAJJkEWjT0K0TePtBRQAINVY` with SHA-256 `ec14ed8d10e876d8aebf753a3cec9edb2385b3d58fda7d6a3b7b81c0efe0a78b`.
+
+Therefore **autonomous orchestrator / Kernel process validation = PASS**. This controlled run was explicitly not sports analysis. **Real sports execution quality under Agent 1.1 / Kernel 0.3 has not yet been performed**, and must be validated separately by a future fresh agent invocation.
