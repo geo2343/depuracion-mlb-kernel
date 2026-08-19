@@ -1,0 +1,52 @@
+{
+  "name": "DEP_MLB_CONNECTED_AGENT_ORCHESTRATOR",
+  "version": "0.5",
+  "agent": "@DepuracionMLB",
+  "agent_version": "DEP-MLB-AGENT-1.3",
+  "system_version": "DEP-MLB-V0.4",
+  "kernel_version": "DEP-MLB-KERNEL-0.5-EXHAUSTIVE-SELECTIVE",
+  "protocol_id": "DEPURACION_MLB_V0_4_EXHAUSTIVE_SELECTIVE",
+  "execution_owner": "AI_AGENT_ORCHESTRATOR",
+  "trigger": "any registered activation alias",
+  "on_trigger": [
+    "verify active Mother hash and required connectors",
+    "create fresh exclusive Drive folder/report and event-attested readback",
+    "bind FULL_AGENT clean-room invocation and create a new run",
+    "freeze a complete eligible Pregame universe before earliest first pitch",
+    "execute F2-F9 for every eligible game without early STOP",
+    "collect dedicated STARTER_PROFILE, OFFENSE_PROFILE, BULLPEN_CONTEXT and DEEP_VERIFICATION evidence for every game",
+    "construct favorable mechanism, adverse route and full-game synthesis claims for every game",
+    "run F7 full-game temporal viability and F8 symmetric materialization/countercase for every game",
+    "run F9 Red Team and horizontal comparison for every game",
+    "admit at most two PRIMARY candidates that satisfy complete-chain, two-mechanism, Red Team and TOP_TWO gates",
+    "freeze exhaustive packets and derive DATABASE_CONTROL_V05 audits",
+    "prepare verified RUN_DOSSIER, HANDOFF_REPORT and convergent MLB_CHAT_REPORT_STANDARD_R1",
+    "finish F10 before EARLIEST_FIRST_PITCH or fail with DEPURATION_INCOMPLETE — NO HANDOFF",
+    "automatically close and seal run/invocation after F10 PASS"
+  ],
+  "candidate_policy": {
+    "maximum_total_candidates": 2,
+    "potential_candidate_enabled": false,
+    "quota_filling_forbidden": true
+  },
+  "minimum_game_burden": {
+    "phases": ["F2","F3","F4","F5","F6","F7","F8","F9"],
+    "sports_evidence_min": 4,
+    "source_families_min": 4,
+    "source_origins_min": 2,
+    "claim_types": ["FAVORABLE_MECHANISM","ADVERSE_ROUTE","FULL_GAME_SYNTHESIS"]
+  },
+  "forbidden_shortcuts": [
+    "early STOP before F9",
+    "POTENTIAL_CANDIDATE in final output",
+    "more than two candidates",
+    "generic-preview silence treated as positive bullpen evidence",
+    "candidate with incomplete full-game chain",
+    "candidate with fewer than two independent containment mechanisms",
+    "candidate that fails Red Team or is outside top two",
+    "any Pregame phase/packet/handoff completion at or after earliest first pitch",
+    "prior-run sports evidence or reasoning reuse",
+    "metric voting replacing AI causal judgment"
+  ],
+  "real_money_authority": false
+}
