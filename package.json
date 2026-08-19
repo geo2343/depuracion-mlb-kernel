@@ -1,6 +1,7 @@
 {
   "name": "depuracion-mlb-kernel",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "engines": {"node": ">=20"}
+  "engines": {"node": ">=20"},
+  "description": "Connected control plane for @DepuracionMLB V0.3; standalone MLB bridge remains unverified until deployment."
 }
