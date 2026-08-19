@@ -1,29 +1,62 @@
 {
   "agent_id": "@DepuracionMLB",
-  "agent_version": "DEP-MLB-AGENT-1.0",
-  "kernel_version": "DEP-MLB-KERNEL-0.2-CONNECTED",
+  "agent_version": "DEP-MLB-AGENT-1.1",
+  "kernel_version": "DEP-MLB-KERNEL-0.3-AUTONOMOUS",
   "protocol_id": "DEPURACION_MLB_V0_3_PROGRESSIVE",
-  "mother_document_sha256": "e5b8272192faf2b06526066ded66fb131ea21a33cc30baee7a127c0e2ff18482",
-  "mother_revision_state": "V0.3 methodology + CONNECTED_AGENT_MIGRATION_NOTICE V0.2",
+  "mother_document_sha256": "a707f5a44ad83d686e608a2c63d5dfbd5bad6f94e7e250b677143b169c8c844f",
+  "mother_revision_state": "V0.3 methodology + AUTONOMOUS_AGENT_ORCHESTRATION_NOTICE V0.3",
   "mandate_drive_id": "1ML5TWbb1uNGbjFj52FlaEUV14Qai_iwp8qs3OOB_d4Q",
   "status_drive_id": "1rIVa0hmEq2enoux227v7eoY48gY9Az0fCHzFNPQ_hlA",
   "connected_runtime_drive_folder_id": "11YDWJAfQ_XJk5yT1t2fvvWB80KU-wr-n",
-  "controlled_validation": {
-    "run_id": "TEST-DEP-V02",
-    "result": "FULL_INFRA_CHAIN_PASS",
-    "sports_analysis": false
+  "execution_model": "ALIAS_BOUND_AUTONOMOUS_AGENT",
+  "activation_rule": "Invocation means execute F0-F10; status-only or manual-assistant substitute is forbidden.",
+  "autonomous_controlled_e2e": {
+    "run_id": "TEST-DEP-AUTONOMOUS-E2E-V03",
+    "result": "PASS",
+    "sports_analysis": false,
+    "f0_f10_states_pass": 11,
+    "run_status": "COMPLETED",
+    "invocation_status": "COMPLETED",
+    "database_derived_audit": "PASS",
+    "handoff_validation": "PASS",
+    "audit_receipt_drive_id": "17PhvlEpDySVTtlPFo9ANAJJkEWjT0K0TePtBRQAINVY",
+    "audit_receipt_sha256": "ec14ed8d10e876d8aebf753a3cec9edb2385b3d58fda7d6a3b7b81c0efe0a78b"
+  },
+  "historical_reclassification": {
+    "run_id": "DEP-MLB-20260820-REAL-1557A",
+    "state": "AUDIT_ONLY",
+    "reason": "PRE_AUTONOMOUS_MANUAL_ASSISTANT_EXECUTION",
+    "may_certify_agent_1_1": false
   },
   "enforcement": {
+    "invocation_record_required": true,
+    "ai_agent_orchestrator_owner_required": true,
+    "new_drive_report_receipt_required_before_run": true,
+    "prior_drive_report_reuse_blocked": true,
+    "fresh_web_event_required_for_sports_evidence": true,
+    "phase_state_machine_f0_f10": true,
+    "phase_order_enforced": true,
+    "phase_specific_ai_artifacts_required": true,
+    "semantic_completeness_fields_required": true,
     "same_run_game_lineage": true,
-    "verified_connector_required_for_tool_event": true,
     "post_first_pitch_sports_evidence_forbidden": true,
     "drive_readback_and_hash_required_for_freeze": true,
     "frozen_packet_immutable": true,
-    "audit_required": true,
+    "database_derived_process_audit": true,
     "full_universe_comparative_coverage_required_for_handoff": true,
-    "drive_readback_required_for_handoff": true,
+    "f10_required_for_completed": true,
+    "f10_auto_closes_run_and_invocation": true,
     "rls_enabled": true,
     "function_search_path_hardened": true
+  },
+  "adversarial_tests": {
+    "recorded_in_supabase": 15,
+    "registry_table": "dep_mlb_kernel_tests",
+    "controlled_e2e_pass": true
+  },
+  "validation_scope": {
+    "autonomous_orchestrator_kernel_process": "PASS",
+    "real_sports_execution_quality_under_agent_1_1": "NOT_YET_PERFORMED"
   },
   "standalone_http": {
     "vercel_project_visible": false,
