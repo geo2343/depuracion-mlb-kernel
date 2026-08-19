@@ -1,95 +1,102 @@
-# @DepuracionMLB — Autonomous Connected Agent
+# @DepuracionMLB — Exhaustive Selective Autonomous Agent
 
-This repository contains the connected autonomous control plane for `@DepuracionMLB` / `@MLBdepuración`.
+This repository contains the connected control plane for `@DepuracionMLB` / `@MLBdepuración`.
 
-## Authority
+## Active authority
 
-Methodological authority remains Google Drive **01 — CONSTITUCIÓN MAESTRA — @DepuracionMLB — V0.3** (`1nod0j35fZeILy7fxUk5IPCT7_qn3f0sEFsxmLbDdfrA`). Current plain-text SHA-256 after `AUTONOMOUS_REFACTOR_NOTICE — V0.4 — ACTIVE`:
+- Mother: **01 — CONSTITUCIÓN MAESTRA — @DepuracionMLB — V0.4**
+- Drive ID: `1nod0j35fZeILy7fxUk5IPCT7_qn3f0sEFsxmLbDdfrA`
+- Mother SHA-256: `0e7bcc838cb70f696c7a29950f304054ac9f7869fa0e166e6d2885bc2968fdc8`
+- Agent: `DEP-MLB-AGENT-1.3`
+- Kernel: `DEP-MLB-KERNEL-0.5-EXHAUSTIVE-SELECTIVE`
+- Protocol: `DEPURACION_MLB_V0_4_EXHAUSTIVE_SELECTIVE`
+- Real-money authority: `FALSE`
 
-`0e4b1382597930cc48b1f40a39d824a4f45208f505c462e9e623e31a0f8130d2`
+An alias invocation means execute the complete agent. A new execution requires a fresh invocation, fresh exclusive Drive folder/report, clean-room run, `AI_AGENT_ORCHESTRATOR` ownership and fresh same-run research.
 
-Runtime V0.1, Connected V0.2 and Autonomous V0.3 notices are historical only. They cannot govern a new invocation or seed sports evidence/reasoning.
+## Core change from Kernel 0.4
 
-## Current identity
+Kernel 0.4 allowed progressive depth and up to four PRIMARY plus two POTENTIAL candidates. A real-run audit showed that this was too permissive and also exposed a temporal closure gap. Kernel 0.5 replaces that design.
 
-- `AGENT_VERSION = DEP-MLB-AGENT-1.2`
-- `SYSTEM_VERSION = DEP-MLB-V0.3`
-- `KERNEL_VERSION = DEP-MLB-KERNEL-0.4-AUTONOMOUS-REFACTOR`
-- `PROTOCOL_ID = DEPURACION_MLB_V0_3_PROGRESSIVE`
-- `EXECUTION_MODEL = ALIAS_BOUND_AUTONOMOUS_AGENT`
-- `REAL_MONEY_AUTHORITY = FALSE`
+### Exhaustive game burden
 
-## Invocation contract
+Every eligible game must complete all of F2 through F9:
 
-An alias invocation means **execute the complete agent**, never describe it or manually imitate it outside the state machine.
+- F2 starter representation;
+- F3 offense representation;
+- F4 dedicated bullpen/context representation;
+- F5 structural cross;
+- F6 mandatory deep verification;
+- F7 full-game temporal viability;
+- F8 materialization plus symmetric countercase;
+- F9 Red Team, false-positive/false-negative review and horizontal comparison.
 
-`alias → invocation → new Drive folder/report → Drive connector existence/readback event → clean RUN owned by AI_AGENT_ORCHESTRATOR → F0…F10`
+No game may be rejected by an early STOP before this burden is complete.
 
-A new run is rejected if it lacks the invocation, reuses prior Drive artifacts, lacks event-attested Drive verification, disables clean room, uses a manual owner or mismatches the active Mother hash/version.
+### Evidence burden
 
-## AI vs Kernel
+A database-derived packet audit cannot PASS unless the game has at least:
 
-The **AI_AGENT** owns sports meaning: causal interpretation, mechanisms, materialization, countercases, false-positive/false-negative reasoning and comparative judgment.
+- 4 SPORTS_RESEARCH evidence rows;
+- 4 source families;
+- 2 source origins;
+- dedicated `STARTER_PROFILE`, `OFFENSE_PROFILE`, `BULLPEN_CONTEXT`, `DEEP_VERIFICATION` evidence;
+- all three causal claim types: `FAVORABLE_MECHANISM`, `ADVERSE_ROUTE`, `FULL_GAME_SYNTHESIS`;
+- all 8 active F2-F9 artifacts.
 
-The **Kernel** owns enforcement: identity, phase targeting/order, tool-event/evidence lineage, hashes, freeze, selective reopening, coverage, database-derived audit, Drive readback, delivery QA and terminal closure. Metrics are not votes.
+`UNKNOWN != RISK` and also `UNKNOWN != SUPPORT`. A generic preview's failure to mention a bullpen problem is not affirmative bullpen evidence.
 
-## Progressive phase targeting
+## Candidate policy
 
-- F1: slate universe / identity.
-- F2-F5: all eligible games.
-- F6: only games whose F5 result is `DISCRIMINANT`.
-- F7-F8: only games that survive F5 or F6.
-- F9: all eligible games again for symmetric Red Team, false-negative rescue and horizontal audit.
-- F10: typed handoff + Drive + CHAT R1 delivery validation.
+The final handoff may contain **at most two candidates total**.
 
-Comparative coverage is always 100%; research depth is intentionally unequal.
+- Candidate tier allowed: `PRIMARY_CANDIDATE`.
+- `POTENTIAL_CANDIDATE` is disabled for new V0.5 executions.
+- Zero, one or two candidates are valid.
+- All remaining games finish `NOT_ADVANCED` with causal/comparative reasons.
+- Empty slots are preferable to quota filling.
 
-## Evidence and trace
+A PRIMARY candidate additionally requires:
 
-For Agent 1.2 / Kernel 0.4, sports evidence requires a fresh same-run **Web** tool event after run start, source URL/origin/as_of, source family, non-empty snapshot and DB-controlled hash lineage. Drive/history cannot become new sports evidence.
+- F8 `FULL_GAME_CHAIN_STATUS=COMPLETE`;
+- at least two independent containment mechanisms;
+- explicit governing failure route;
+- F9 `CANDIDATE_GATE=PASS`;
+- F9 `RED_TEAM_VERDICT=SURVIVES`;
+- F9 `COMPARATIVE_VERDICT=TOP_TWO`.
 
-Tool-response hashes, evidence snapshot hashes, phase hashes and packet hashes are database-derived. A packet can freeze only after F9 and only with an event-attested Google Drive artifact. Process audit status is derived by `DATABASE_CONTROL_V04`; caller PASS/FAIL has no authority.
+The Kernel enforces representation and consistency; the AI remains the sports reasoner. There is no additive metric voting.
 
-## Reopening
+## Pregame temporal integrity
 
-Before F9 PASS, a fresh material Web update may reopen selectively from F1/F2/F3/F4/F6/F7. Superseded downstream artifacts/claims remain in history with `superseded_at`.
+`EARLIEST_FIRST_PITCH` is the hard terminal deadline for the slate. F1-F10, game artifacts, F9 horizontal audit, packet freeze, database audits, Drive handoff and Chat R1 must all finish before that deadline. If the window is missed, the only valid terminal outcome is `DEPURATION_INCOMPLETE — NO HANDOFF`.
 
-After F9 PASS, new Web research is blocked for that run. A material change requires a fresh clean-room run; terminal comparative truth is not rewritten.
+## Delivery
 
-## F10 / delivery QA
-
-F10 requires:
-
-- 100% comparative closure;
-- one frozen database-audited packet per eligible game;
-- event-attested `RUN_DOSSIER`;
-- event-attested `HANDOFF_REPORT`;
-- typed PRIMARY/POTENTIAL fields required by Mother V0.3;
-- explicit best-excluded comparison and empty-slot justification;
-- convergent `MLB_CHAT_REPORT_STANDARD_R1` covering every NOT_ADVANCED game;
-- `DRIVE_REPORT_COMPLETE=PASS`;
-- `CHAT_REPORT_COMPLETE=PASS`;
-- `DELIVERY_STATUS=COMPLETE`.
-
-F10 PASS automatically closes and seals both run and invocation. Completed-run trace and PASS handoff are immutable.
+F10 requires 100% comparative closure, one frozen `EXHAUSTIVE` packet and `DATABASE_CONTROL_V05` audit PASS per game, verified RUN_DOSSIER, verified HANDOFF_REPORT, convergent frozen `MLB_CHAT_REPORT_STANDARD_R1`, no POTENTIAL candidates and at most two PRIMARY candidates. F10 PASS automatically closes the run and invocation.
 
 ## Validation
 
-A formal Change Request + Refactor Review was completed before V0.4 implementation because V0.3 had exceeded the Mother anti-patch threshold.
+Controlled non-sports run: `TEST-DEP-AUTONOMOUS-E2E-V05`.
 
-Controlled non-sports validation run: `TEST-DEP-AUTONOMOUS-E2E-V04`.
-
-- F0→F10: 11/11 PASS.
-- Kernel adversarial/regression tests: 17/17 PASS.
-- STOP path: expected 5 active game artifacts, observed 5.
-- DISCRIMINANT→SURVIVE path: expected 8, observed 8.
-- Database-derived packet audits: 2/2 PASS.
-- CHAT R1: PASS.
+- F0-F10: 11/11 PASS.
+- Controlled objects: 3.
+- F2-F9 exhaustive coverage: 3/3.
+- Database-derived packet audits: 3/3 PASS.
+- Final controlled classification: 2 PRIMARY / 0 POTENTIAL / 1 NOT_ADVANCED.
+- Handoff: PASS.
+- Chat R1: PASS and frozen.
 - Delivery: COMPLETE.
-- Run/orchestration/invocation: COMPLETED automatically.
+- Run/orchestration/invocation: automatically COMPLETED.
 
-This run contains **no sports analysis**. Therefore autonomous orchestrator / Kernel process validation is PASS, while **real sports execution quality under Agent 1.2 / Kernel 0.4 remains NOT_YET_PERFORMED** until a future fresh real alias invocation.
+Adversarial controls physically confirmed: a weak third candidate was rejected, a POTENTIAL candidate in handoff was rejected, and a Pregame run whose earliest first pitch had already passed was rejected at F1.
 
-## Connectors
+The historical real run `DEP-MLB-20260819-REAL-1823-V04-A` is recorded as `POSTRUN_AUDIT_V05 = FAIL`, with `sports_certification_valid=false`, for `TEMPORAL_INTEGRITY_FAIL`, `CANDIDATE_OVERBREADTH`, and insufficient Full Game source depth in some games.
 
-Web, Google Drive, Supabase and GitHub are required for connected execution. Vercel remains optional for standalone HTTP and must not be claimed deployed while no project is physically visible.
+This controlled V0.5 validation contains no real MLB analysis. Real sports quality under Agent 1.3 must be evaluated in a future fresh clean-room invocation.
+
+## Security
+
+All `dep_mlb_*` tables have RLS enabled. There are zero `dep_mlb_*` functions without explicit `search_path` and zero SECURITY DEFINER functions. Run defaults are aligned to System V0.4 / Agent 1.3 / Kernel 0.5.
+
+Vercel remains optional for standalone HTTP execution and is not part of connected ChatGPT process validation.
