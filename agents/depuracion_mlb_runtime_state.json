@@ -1,76 +1,80 @@
 {
   "agent_id": "@DepuracionMLB",
-  "agent_version": "DEP-MLB-AGENT-1.2",
-  "kernel_version": "DEP-MLB-KERNEL-0.4-AUTONOMOUS-REFACTOR",
-  "system_version": "DEP-MLB-V0.3",
-  "protocol_id": "DEPURACION_MLB_V0_3_PROGRESSIVE",
-  "mother_document_sha256": "0e4b1382597930cc48b1f40a39d824a4f45208f505c462e9e623e31a0f8130d2",
-  "mother_revision_state": "V0.3 methodology + AUTONOMOUS_REFACTOR_NOTICE V0.4 ACTIVE",
+  "agent_version": "DEP-MLB-AGENT-1.3",
+  "system_version": "DEP-MLB-V0.4",
+  "kernel_version": "DEP-MLB-KERNEL-0.5-EXHAUSTIVE-SELECTIVE",
+  "protocol_id": "DEPURACION_MLB_V0_4_EXHAUSTIVE_SELECTIVE",
+  "mother_document_sha256": "0e7bcc838cb70f696c7a29950f304054ac9f7869fa0e166e6d2885bc2968fdc8",
+  "mother_drive_id": "1nod0j35fZeILy7fxUk5IPCT7_qn3f0sEFsxmLbDdfrA",
   "mandate_drive_id": "1ML5TWbb1uNGbjFj52FlaEUV14Qai_iwp8qs3OOB_d4Q",
   "status_drive_id": "1rIVa0hmEq2enoux227v7eoY48gY9Az0fCHzFNPQ_hlA",
-  "runtime_drive_folder_id": "11YDWJAfQ_XJk5yT1t2fvvWB80KU-wr-n",
-  "refactor_review_drive_id": "1Ch5auBTRgsGdhSQf8Uy8VQ9L_LfL82cZ3hBd6NV2PGY",
-  "integral_audit_drive_id": "1MRU8z_j3xY3zqvPCksA4a8xH1O3IF3cQFzOAGfgBR5o",
+  "audit_drive_id": "1MRU8z_j3xY3zqvPCksA4a8xH1O3IF3cQFzOAGfgBR5o",
+  "refactor_review_drive_id": "1rlqHkx29KPFeAZ-Yaqcm4u6MrEdlp8PdxNBkqCHJcGA",
   "execution_model": "ALIAS_BOUND_AUTONOMOUS_AGENT",
+  "analysis_mode": "EXHAUSTIVE_COMPARATIVE_SCREENING",
+  "candidate_policy": {
+    "maximum_total_candidates": 2,
+    "potential_candidate_enabled": false,
+    "valid_final_classes": ["PRIMARY_CANDIDATE", "NOT_ADVANCED"]
+  },
+  "enforcement": {
+    "all_games_f2_f9_required": true,
+    "dedicated_starter_profile": true,
+    "dedicated_offense_profile": true,
+    "dedicated_bullpen_context": true,
+    "mandatory_deep_verification": true,
+    "minimum_sports_evidence_per_game": 4,
+    "minimum_source_families_per_game": 4,
+    "minimum_source_origins_per_game": 2,
+    "required_claim_types_per_game": 3,
+    "unknown_is_not_support": true,
+    "candidate_complete_full_game_chain_required": true,
+    "candidate_two_independent_mechanisms_required": true,
+    "candidate_red_team_survival_required": true,
+    "candidate_top_two_required": true,
+    "earliest_first_pitch_terminal_gate": true,
+    "packet_depth_mode": "EXHAUSTIVE",
+    "process_audit": "DATABASE_CONTROL_V05",
+    "f10_auto_closes_run_and_invocation": true,
+    "completed_run_immutable": true
+  },
   "controlled_e2e": {
-    "run_id": "TEST-DEP-AUTONOMOUS-E2E-V04",
+    "run_id": "TEST-DEP-AUTONOMOUS-E2E-V05",
     "sports_analysis": false,
     "result": "PASS",
     "f0_f10_states_pass": 11,
-    "packet_audits_pass": 2,
-    "kernel_tests_pass": 17,
+    "controlled_objects": 3,
+    "exhaustive_f2_f9_objects": 3,
+    "packet_audits_pass": 3,
+    "primary_candidates": 2,
+    "potential_candidates": 0,
+    "not_advanced": 1,
+    "handoff": "PASS",
+    "chat_r1": "PASS_FROZEN",
+    "delivery": "COMPLETE",
     "run_status": "COMPLETED",
-    "invocation_status": "COMPLETED",
-    "delivery_status": "COMPLETE",
-    "chat_r1_qa": "PASS"
+    "invocation_status": "COMPLETED"
   },
-  "progressive_depth_validation": {
-    "stop_path_expected_artifacts": 5,
-    "stop_path_observed_artifacts": 5,
-    "discriminant_survivor_expected_artifacts": 8,
-    "discriminant_survivor_observed_artifacts": 8,
-    "f6_on_stop_rejected": true,
-    "f7_on_stop_rejected": true
+  "adversarial_tests": {
+    "third_candidate_without_f8_burden": "PASS_BLOCKED",
+    "potential_candidate_at_handoff": "PASS_BLOCKED",
+    "earliest_first_pitch_blocks_pregame": "PASS_BLOCKED"
   },
-  "enforcement": {
-    "invocation_and_unique_drive_receipt_required": true,
-    "drive_receipt_bound_to_connector_event": true,
-    "ai_agent_orchestrator_owner_required": true,
-    "fresh_web_sports_evidence_required": true,
-    "sports_source_url_origin_asof_required": true,
-    "evidence_tool_response_hash_bound": true,
-    "phase_hashes_database_derived": true,
-    "progressive_phase_targeting": true,
-    "phase_artifacts_immutable_after_pass": true,
-    "selective_reopen_before_f9": true,
-    "post_f9_material_change_requires_new_run": true,
-    "packet_hash_database_derived": true,
-    "drive_readback_event_attested": true,
-    "process_audit_database_control_v04": true,
-    "typed_handoff_required": true,
-    "run_dossier_required": true,
-    "chat_r1_required": true,
-    "delivery_qa_required": true,
-    "completed_run_trace_sealed": true,
-    "handoff_immutable_after_pass": true,
-    "f10_auto_closes_run_and_invocation": true,
-    "rls_enabled": true,
-    "dep_mlb_function_search_path_hardened": true
+  "security": {
+    "tables_without_rls": 0,
+    "functions_without_search_path": 0,
+    "security_definer_functions": 0,
+    "run_defaults_aligned": true
   },
-  "historical_reclassification": {
-    "run_id": "DEP-MLB-20260820-REAL-1557A",
-    "state": "AUDIT_ONLY",
-    "reason": "PRE_AUTONOMOUS_MANUAL_ASSISTANT_EXECUTION",
-    "may_certify_agent_1_2": false
+  "historical_audit_fail": {
+    "run_id": "DEP-MLB-20260819-REAL-1823-V04-A",
+    "verdict": "FAIL",
+    "sports_certification_valid": false,
+    "reasons": ["TEMPORAL_INTEGRITY_FAIL", "CANDIDATE_OVERBREADTH", "FULL_GAME_SOURCE_DEPTH_INSUFFICIENT_FOR_SOME_GAMES"]
   },
   "validation_scope": {
-    "autonomous_orchestrator_kernel_process": "PASS",
-    "real_sports_execution_quality_under_agent_1_2": "NOT_YET_PERFORMED"
-  },
-  "standalone_http": {
-    "vercel_project_visible": false,
-    "required_for_chatgpt_connected_execution": false,
-    "production_ready_standalone": false
+    "orchestrator_kernel_process": "PASS",
+    "real_sports_execution_quality_agent_1_3": "NOT_YET_PERFORMED"
   },
   "real_money_authority": false
 }
