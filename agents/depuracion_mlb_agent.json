@@ -13,6 +13,7 @@
     "must_create_fresh_invocation": true,
     "must_create_fresh_run": true,
     "must_create_new_drive_folder_and_report_before_sports_analysis": true,
+    "must_verify_new_drive_report_before_run_creation": true,
     "must_use_fresh_web_research": true,
     "prior_run_sports_reasoning_or_evidence_reuse_forbidden": true,
     "manual_phase_authorization_required": false,
@@ -22,18 +23,19 @@
     "canonical_mother_document": {
       "title": "01 — CONSTITUCIÓN MAESTRA — @DepuracionMLB — V0.3",
       "drive_id": "1nod0j35fZeILy7fxUk5IPCT7_qn3f0sEFsxmLbDdfrA",
-      "verified_plain_text_export_sha256": "e5b8272192faf2b06526066ded66fb131ea21a33cc30baee7a127c0e2ff18482"
+      "verified_plain_text_export_sha256": "a707f5a44ad83d686e608a2c63d5dfbd5bad6f94e7e250b677143b169c8c844f",
+      "operational_notice": "AUTONOMOUS_AGENT_ORCHESTRATION_NOTICE V0.3"
     }
   },
   "mission": "Autonomously execute the complete MLB pregame depuration workflow for FULL GAME UNDER research, compare the entire eligible slate and produce a reasoned handoff shortlist for downstream deep investigation. It does not decide wagers.",
   "execution_owner": "AI_AGENT_ORCHESTRATOR",
   "execution_contract": [
-    "Resolve alias invocation and register dep_mlb_agent_invocations.",
-    "Create a new Drive run folder and exclusive report before sports research.",
-    "Create a new Supabase run bound to the invocation; manual runs are invalid.",
+    "Resolve alias invocation and create a new Drive run folder plus exclusive report.",
+    "Read back the new Drive report and register dep_mlb_agent_invocations plus dep_mlb_invocation_drive_receipts.",
+    "Create a new Supabase run bound to invocation_id with execution_owner AI_AGENT_ORCHESTRATOR; manual runs are invalid.",
     "Execute F1 through F10 autonomously in order.",
     "AI_AGENT owns semantic and causal sports reasoning; Kernel never substitutes score voting.",
-    "Every material lookup becomes a tool event and every factual sports claim must be evidence-linked within the same run/game.",
+    "Every material sports lookup becomes a fresh Web tool event after run start and every factual sports claim must be evidence-linked within the same run/game.",
     "Every phase must emit physical dep_mlb_phase_artifacts before Kernel can mark the phase PASS.",
     "Adaptive depth is allowed, but every eligible game must receive the phase artifact required to explain advancement, stop or resolution.",
     "F9 requires game-level Red Team artifacts plus a slate-level horizontal audit.",
@@ -64,16 +66,18 @@
     "handoff": "DEPURATION_HANDOFF_PACKET"
   },
   "connectors": {
-    "Web": {"required": true, "role": "fresh current public MLB research"},
-    "Google_Drive": {"required": true, "role": "authority, exclusive run dossier, readback and handoff", "root_folder_id": "1N8r-rn51Cj2kokFxIzasvhIlH6P1-x4i"},
+    "Web": {"required": true, "role": "fresh current public MLB research after run start"},
+    "Google_Drive": {"required": true, "role": "authority, new-run creation receipt, exclusive dossier, readback and handoff", "root_folder_id": "1N8r-rn51Cj2kokFxIzasvhIlH6P1-x4i"},
     "GitHub": {"required": true, "role": "versioned manifest, protocol, runtime contract and migrations", "repository": "geo2343/depuracion-mlb-kernel"},
-    "Supabase": {"required": true, "role": "invocation binding, durable state, phase machine, lineage and enforcement", "project_id": "yejaollmavoudbxnbpll"},
+    "Supabase": {"required": true, "role": "invocation binding, phase machine, lineage, clean-room enforcement and handoff validation", "project_id": "yejaollmavoudbxnbpll"},
     "Vercel": {"required": false, "role": "optional standalone HTTP runtime; not required for ChatGPT-connected execution", "state": "NOT_VISIBLE_AT_LAST_VERIFICATION"}
   },
   "hard_truth_rules": [
     "An alias invocation means execute the agent, not explain the agent.",
-    "No new autonomous run without a physical invocation record.",
-    "No phase PASS without ordered state and physical phase artifacts.",
+    "No new autonomous run without a physical invocation record and verified new Drive report receipt.",
+    "No reused Drive report from a prior run.",
+    "No SPORTS_RESEARCH evidence from Drive/history; Kernel 0.3 requires a fresh Web tool event created after run start.",
+    "No phase PASS without ordered state and physical AI_AGENT phase artifacts.",
     "No narrated research counts as evidence without a material tool event.",
     "No prior-run sports reasoning, packets, candidates or evidence may seed a fresh run.",
     "No F10 success without database-validated handoff and verified Drive readback.",
