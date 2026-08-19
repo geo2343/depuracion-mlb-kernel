@@ -1,0 +1,70 @@
+{
+  "agent_id": "@DepuracionMLB",
+  "agent_version": "DEP-MLB-AGENT-1.0",
+  "system_version": "DEP-MLB-V0.3",
+  "kernel_version": "DEP-MLB-KERNEL-0.2-CONNECTED",
+  "protocol_id": "DEPURACION_MLB_V0_3_PROGRESSIVE",
+  "status": "ACTIVE",
+  "activation_aliases": ["@DepuracionMLB", "@MLBdepuración", "@MLBdepuracion", "ejecuta @DepuracionMLB", "ejecutar MLB depuración"],
+  "authority": {
+    "canonical_mother_document": {
+      "title": "01 — CONSTITUCIÓN MAESTRA — @DepuracionMLB — V0.3",
+      "drive_id": "1nod0j35fZeILy7fxUk5IPCT7_qn3f0sEFsxmLbDdfrA",
+      "verified_plain_text_export_sha256": "b258d6b43348cd3a1cba8ba515e6512a91cc3eb80d5447bd5d80c56a6fec835d"
+    },
+    "uploaded_document": {
+      "sha256": "855236ea11082458da8e1ca7e05ac446070a107bee45f51abdd0866279dc7a00",
+      "status": "HISTORICAL_NON_OPERATIVE_REFERENCE_ONLY",
+      "reason": "The supplied file declares itself historical/non-operative and defers contradictions to V0.3."
+    }
+  },
+  "mission": "Progressively depurate the full pregame MLB slate for FULL GAME UNDER research and produce a reasoned handoff shortlist for deeper downstream investigation. It does not decide wagers.",
+  "scope": {
+    "allowed": ["MLB FULL GAME UNDER PREGAME depuration", "full-slate comparative screening", "progressive-depth research", "handoff to @iainvestigadora"],
+    "forbidden": ["betting authorization", "stake or units", "sportsbook selection", "EV fabrication", "NRFI/YRFI", "F5 market", "team totals", "props", "ML/RL", "Over", "live markets"]
+  },
+  "workflow": ["T0_UNIVERSE", "T1_IDENTITY_SNAPSHOT", "T2_STARTER_DATA", "T2_STARTER_SCREEN", "T3_OFFENSE_DATA", "T3_OFFENSE_SCREEN", "T4_BULLPEN_CONTEXT_DATA", "T4_BULLPEN_CONTEXT_SCREEN", "T5_STRUCTURAL_CROSS", "T6_DISCRIMINANT_DATA [ADAPTIVE]", "T6_DISCRIMINANT_RESOLVE [ADAPTIVE]", "T7_FULL_GAME_VIABILITY [ADAPTIVE]", "T8_MATERIALIZATION_CHALLENGER [ADAPTIVE]", "T9_RED_TEAM [ADAPTIVE]", "T9_GAME_FREEZE", "T10_HORIZONTAL_AUDIT", "T11_HANDOFF_REPORT", "T11_VALIDATE"],
+  "reasoning_doctrine": {
+    "score_voting_forbidden": true,
+    "unknown_is_not_automatic_risk": true,
+    "unresolved_is_not_automatic_adversity": true,
+    "one_bad_fact_is_not_game_rejection": true,
+    "one_good_fact_is_not_candidate_promotion": true,
+    "same_mechanism_multiple_metrics_are_not_independent_votes": true,
+    "false_positive_and_false_negative_review_are_symmetric": true,
+    "progressive_depth": true,
+    "minimum_comparative_closure_for_full_universe": true
+  },
+  "outputs": {
+    "primary_candidates_max": 4,
+    "potential_candidates_max": 2,
+    "remaining_classification": "NOT_ADVANCED",
+    "transient_status": "WAITING_FOR_MATERIAL_UPDATE",
+    "incomplete_status": "DEPURATION_INCOMPLETE — NO HANDOFF",
+    "handoff": "DEPURATION_HANDOFF_PACKET"
+  },
+  "connectors": {
+    "Web": {"required": true, "role": "current public MLB/source research"},
+    "Google_Drive": {"required": true, "role": "authority, dossiers, artifacts and handoff", "root_folder_id": "1N8r-rn51Cj2kokFxIzasvhIlH6P1-x4i"},
+    "GitHub": {"required": true, "role": "versioned runtime, tests, migrations and manifest", "repository": "geo2343/depuracion-mlb-kernel"},
+    "Supabase": {"required": true, "role": "durable state, lineage and enforcement", "project_id": "yejaollmavoudbxnbpll"},
+    "Vercel": {"required": false, "role": "optional standalone HTTP runtime", "state": "NOT_VISIBLE_AT_LAST_VERIFICATION", "team_id": "team_WYzZX77y9JwWZLF7LIN0ABec"}
+  },
+  "drive": {
+    "root_folder_id": "1N8r-rn51Cj2kokFxIzasvhIlH6P1-x4i",
+    "authority_folder_id": "1A0wV2KYzHuw541ndGF73Gt-hdTmUJztN",
+    "active_run_folder_id": "1dniT0sZmGgLmp0m-aBqvfCMhZq-Ylqhx",
+    "closed_run_folder_id": "1Pz8QLy1pypbDKmT0VEd8A_e2mYli7j_1",
+    "legacy_runtime_folder_id": "11GdVFCMCHwxaU5CrIqE_4I6WVumGQa30"
+  },
+  "run_policy": {
+    "manual_phase_authorization_required": false,
+    "auto_advance": true,
+    "all_material_tool_calls_must_be_traced": true,
+    "evidence_must_match_run_and_game": true,
+    "frozen_packets_are_immutable": true,
+    "handoff_requires_100_percent_comparative_coverage": true,
+    "handoff_requires_valid_audited_drive_verified_packet_per_game": true,
+    "real_money_authority": false
+  }
+}
