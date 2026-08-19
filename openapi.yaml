@@ -1,0 +1,27 @@
+openapi: 3.1.0
+info:
+  title: DepuracionMLB Kernel
+  version: 0.1.0
+servers:
+  - url: https://REPLACE-WITH-VERCEL-DOMAIN
+paths:
+  /api/health:
+    get:
+      operationId: kernelHealth
+      responses:
+        '200':
+          description: Kernel health
+  /api/kernel:
+    get:
+      operationId: executeKernelTask
+      parameters:
+        - in: query
+          name: task
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Task accepted
+        '409':
+          description: Task rejected by Kernel
