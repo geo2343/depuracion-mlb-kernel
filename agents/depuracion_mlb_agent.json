@@ -4,8 +4,8 @@
   "system_version": "DEP-MLB-V0.5",
   "kernel_version": "DEP-MLB-KERNEL-0.7-REASONING-GUARD",
   "protocol_id": "DEPURACION_MLB_V0_5_REASONING_GUARD",
-  "status": "DISABLED",
-  "status_reason": "V0.7 controlled E2E and terminal audit required before activation",
+  "status": "ACTIVE",
+  "status_reason": "V0.7 controlled E2E and terminal audit PASS",
   "activation_aliases": ["@DepuracionMLB", "@MLBdepuración", "@MLBdepuracion", "ejecuta @DepuracionMLB", "ejecutar MLB depuración"],
   "execution_model": "ALIAS_BOUND_AUTONOMOUS_AGENT",
   "execution_owner": "AI_AGENT_ORCHESTRATOR",
@@ -124,8 +124,15 @@
     "delivery_status_required": "COMPLETE"
   },
   "validation": {
-    "state": "PENDING_CONTROLLED_E2E",
+    "state": "PASS",
+    "controlled_run_id": "TEST-DEP-AUTONOMOUS-E2E-V07-REASONING",
+    "f10_completion_hash": "847e05a028ef1a3334ed0b68c603489aec2798663af42f7ec8e476ae6c28f44f",
+    "handoff_hash": "f7ef59222a0800c6d7217531b505a514e6f1878182695511c74ef9a08be21ff9",
+    "chat_r1_hash": "65f3d908f3d3d662f16495facbefb066c93932c8908d4fcb21b729028125c17b",
+    "run_audit_verdict": "PASS",
+    "terminal_mutation_guard": "PASS",
     "sports_analysis": false,
+    "sports_certification_valid": false,
     "superseded_v06_run": "TEST-DEP-AUTONOMOUS-E2E-V06-T100",
     "superseded_v06_disposition": "AUDIT_ONLY / sports_certification_valid=false",
     "real_sports_quality_agent_1_5": "NOT_YET_PERFORMED"
