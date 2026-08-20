@@ -3,7 +3,7 @@
   "methodology_version": "DEP-MLB-V0.5",
   "agent_version": "DEP-MLB-AGENT-1.5",
   "kernel_version": "DEP-MLB-KERNEL-0.7-REASONING-GUARD",
-  "status": "DISABLED_PENDING_CONTROLLED_E2E",
+  "status": "ACTIVE_AFTER_CONTROLLED_E2E",
   "sports_object": "MLB FULL GAME UNDER — PREGAME",
   "authority_boundary": {
     "filter_orchestrator_only": true,
@@ -135,6 +135,14 @@
   },
   "validation": {
     "required": "CONTROLLED_E2E_F0_F10_PLUS_ADVERSARIAL_PLUS_TERMINAL_PLUS_CROSS_SYSTEM_READBACK",
-    "current_state": "PENDING"
+    "current_state": "PASS",
+    "run_id": "TEST-DEP-AUTONOMOUS-E2E-V07-REASONING",
+    "f10_completion_hash": "847e05a028ef1a3334ed0b68c603489aec2798663af42f7ec8e476ae6c28f44f",
+    "handoff_hash": "f7ef59222a0800c6d7217531b505a514e6f1878182695511c74ef9a08be21ff9",
+    "chat_r1_hash": "65f3d908f3d3d662f16495facbefb066c93932c8908d4fcb21b729028125c17b",
+    "terminal_mutation_guard": "PASS",
+    "run_audit_verdict": "PASS",
+    "sports_certification_valid": false,
+    "validated_at": "2026-08-20T16:34:09Z"
   }
 }
