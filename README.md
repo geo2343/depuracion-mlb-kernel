@@ -10,7 +10,7 @@ Connected control plane for `@DepuracionMLB` / `@MLBdepuración`.
 - Agent: `DEP-MLB-AGENT-1.5`
 - Kernel: `DEP-MLB-KERNEL-0.7-REASONING-GUARD`
 - Protocol: `DEPURACION_MLB_V0_5_REASONING_GUARD`
-- Runtime status while validating: `DISABLED`
+- Runtime status: `ACTIVE` after controlled E2E + terminal audit PASS
 - Real-money authority: `FALSE`
 
 A supported alias means FULL_AGENT_EXECUTION. Each real sports execution requires a new clean-room invocation, a new exclusive Drive folder/report, `AI_AGENT_ORCHESTRATOR` ownership, fresh same-run research, mandatory T100 consultation, F0→F10 and complete delivery.
@@ -119,8 +119,20 @@ F10 requires 100% comparative closure, one frozen audited packet per eligible ga
 
 ## Validation state
 
-The prior controlled V0.6 run `TEST-DEP-AUTONOMOUS-E2E-V06-T100` was reclassified `AUDIT_ONLY` with `sports_certification_valid=false` after the V0.7 semantic audit found claim-family, genealogy, mechanism-independence, F6 precommit, F9 ranking and T100-scope defects.
+The prior controlled V0.6 run `TEST-DEP-AUTONOMOUS-E2E-V06-T100` remains `AUDIT_ONLY` with `sports_certification_valid=false`.
 
-Agent 1.5 / Kernel 0.7 remains `DISABLED` until a new controlled clean-room F0→F10 run, adversarial suite, terminal mutation tests and cross-system authority readback all pass. No real MLB sports conclusion is certified by infrastructure validation.
+The controlled V0.7 run `TEST-DEP-AUTONOMOUS-E2E-V07-REASONING` completed F0→F10 with:
+
+- F10 completion hash `847e05a028ef1a3334ed0b68c603489aec2798663af42f7ec8e476ae6c28f44f`;
+- three frozen Game Packets and three `DATABASE_CONTROL_V07` process audits = `PASS`;
+- handoff `PASS`, `DELIVERY_STATUS=COMPLETE`, hash `f7ef59222a0800c6d7217531b505a514e6f1878182695511c74ef9a08be21ff9`;
+- Chat R1 `PASS` and frozen, hash `65f3d908f3d3d662f16495facbefb066c93932c8908d4fcb21b729028125c17b`;
+- zero orphan Web events, unsourced claims, unreferenced claims and artifacts without claims;
+- T100 pending material rules = 0;
+- terminal mutation guard = `PASS`;
+- final controlled run audit verdict = `PASS`;
+- `sports_certification_valid=false` because infrastructure/process validation does not certify real MLB sports quality.
+
+The V0.7 activation condition defined in the change request — controlled E2E plus terminal audit PASS — is therefore satisfied. Agent 1.5 / Kernel 0.7 may be `ACTIVE`, while every real invocation must still create a fresh run and satisfy all F0→F10 gates independently.
 
 Vercel remains optional and outside connected-agent certification unless separately deployed and verified.
