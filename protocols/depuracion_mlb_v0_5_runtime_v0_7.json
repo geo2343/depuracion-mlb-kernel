@@ -1,0 +1,140 @@
+{
+  "protocol_id": "DEPURACION_MLB_V0_5_REASONING_GUARD",
+  "methodology_version": "DEP-MLB-V0.5",
+  "agent_version": "DEP-MLB-AGENT-1.5",
+  "kernel_version": "DEP-MLB-KERNEL-0.7-REASONING-GUARD",
+  "status": "DISABLED_PENDING_CONTROLLED_E2E",
+  "sports_object": "MLB FULL GAME UNDER — PREGAME",
+  "authority_boundary": {
+    "filter_orchestrator_only": true,
+    "real_money_authority": false,
+    "market_inputs_for_ranking_forbidden": true,
+    "forbidden_objects": ["line", "price", "juice", "sportsbook", "EV", "stake", "units", "bet_authorization"]
+  },
+  "universe_policy": {
+    "F2_F9_all_eligible_games": true,
+    "F6_mandatory_per_game": true,
+    "maximum_primary_candidates": 2,
+    "potential_candidate_enabled": false,
+    "quota_filling_forbidden": true
+  },
+  "phase_flow": [
+    "F0_INVOCATION_BIND",
+    "F1_UNIVERSE_IDENTITY_SNAPSHOT",
+    "F2_STARTER_SCREEN",
+    "F3_OFFENSE_SCREEN",
+    "F4_BULLPEN_CONTEXT",
+    "F5_STRUCTURAL_SYNTHESIS",
+    "F6_PRECOMMIT_THEN_DEEP_VERIFICATION",
+    "F7_FULL_GAME_TEMPORAL_VIABILITY",
+    "F8_MATERIALIZATION_AND_COUNTERCASE",
+    "F9_T100_CARD_THEN_FINAL_FRESHNESS_THEN_PRE_REVIEW_THEN_HORIZONTAL_AUDIT_THEN_FINAL_CLASSIFICATION",
+    "F10_AUDITED_DELIVERY"
+  ],
+  "claim_lineage": {
+    "F2": {"types": ["STARTER_FINDING"], "allowed_evidence_families": ["STARTER_PROFILE"], "parents": []},
+    "F3": {"types": ["OFFENSE_FINDING"], "allowed_evidence_families": ["OFFENSE_PROFILE"], "parents": []},
+    "F4": {"types": ["BULLPEN_FINDING"], "allowed_evidence_families": ["BULLPEN_CONTEXT"], "parents": []},
+    "F5": {"types": ["STRUCTURAL_SYNTHESIS"], "required_parent_phases": ["F2", "F3", "F4"]},
+    "F6": {"types": ["DEEP_VERIFICATION_FINDING"], "required_parent_phases": ["F5"], "precommit_required": true, "deep_evidence_required": true},
+    "F7": {"types": ["FULL_GAME_VIABILITY"], "required_parent_phases": ["F5", "F6"]},
+    "F8": {"types": ["FAVORABLE_MECHANISM", "ADVERSE_ROUTE"], "required_parent_phases": ["F6", "F7"]},
+    "F9": {"types": ["FULL_GAME_SYNTHESIS", "FINAL_CLASSIFICATION"], "full_game_synthesis_parents": ["F7", "F8_FAVORABLE_MECHANISM", "F8_ADVERSE_ROUTE"], "final_classification_parent": "F9_FULL_GAME_SYNTHESIS"}
+  },
+  "f6_precommit": {
+    "required_before_web_deep_verification": true,
+    "fields": ["deep_question", "prior_hypothesis", "falsifier", "strengthens_if", "degrades_if", "materiality_reason"],
+    "deep_question_must_match_final_f6_artifact": true
+  },
+  "uncertainty": {
+    "structured_register_required_F5_F9": true,
+    "states": ["UNKNOWN", "CONFLICT", "STALE", "RESOLVED"],
+    "UNKNOWN_direction": "NEUTRAL",
+    "unresolved_CONFLICT_direction": "NEUTRAL",
+    "automatic_sports_sign_for_unknown_forbidden": true
+  },
+  "mechanism_independence": {
+    "typed_object_required": true,
+    "fields": ["mechanism_id", "family", "side", "independence_key", "claim_ids", "causal_path", "non_overlap_reason"],
+    "allowed_independence_keys": ["AWAY_STARTER_SUPPRESSION", "HOME_STARTER_SUPPRESSION", "AWAY_OFFENSE_LIMITATION", "HOME_OFFENSE_LIMITATION", "AWAY_BULLPEN_CHAIN", "HOME_BULLPEN_CHAIN", "DEFENSE_ENVIRONMENT", "BILATERAL_TRAFFIC_CONVERSION"],
+    "duplicate_independence_key_forbidden": true,
+    "identical_claim_sets_cannot_count_twice": true,
+    "primary_minimum_distinct_mechanisms": 2
+  },
+  "f9": {
+    "final_freshness_required_before_pre_review": true,
+    "final_freshness_roles": ["STARTER_IDENTITY_FINAL", "LINEUP_STATUS_FINAL", "ABSENCE_STATUS_FINAL", "BULLPEN_AVAILABILITY_FINAL"],
+    "pre_review_forbids_rank_and_final_classification": true,
+    "pre_review_fields": ["individual_gate", "red_team_verdict", "false_positive_check", "false_negative_check", "full_game_chain_status", "independent_containment_mechanisms", "governing_failure_route", "uncertainty_register", "source_conflicts_considered", "reasoning"],
+    "horizontal_order_exact_unique_universe": true,
+    "admissible_set_derived_from_pre_reviews": true,
+    "candidate_count": "min(2, admissible_count)",
+    "primary_definition": "first two individually admissible games in horizontal order",
+    "rank_three_individually_admissible": "NOT_ADVANCED + OUTCOMPETED_COMPARATIVELY",
+    "failed_individual_gate": "NOT_ADVANCED + GOVERNING_ADVERSE_ROUTE"
+  },
+  "t100": {
+    "notion_required": true,
+    "exact_snapshot_equals_notion_catalog": true,
+    "canonical_page": "f92a1fbb-d26c-4d83-8130-55ccfe2d943b",
+    "protocol_page": "3b1d50b4-5372-81cb-bb85-e3d2cd7369d5",
+    "catalog": "collection://3905d88f-5e70-4ee8-81c3-bb696c4e5ac1",
+    "integration_page": "3c2d50b4-5372-8191-8b50-f294265a5800",
+    "f9_catalog_phase_mapping": "F7",
+    "boundary_rule_ids": ["T100-17", "T100-29", "T100-35", "T100-38", "T100-40", "T100-42", "T100-43", "T100-44", "T100-45", "T100-GOB-01", "T100-GOB-02"],
+    "rapid_mode_T100_43_forbidden": true,
+    "reason": "higher DEP-MLB-V0.5 authority requires exhaustive F2-F9",
+    "rules_are_not_votes": true
+  },
+  "evidence": {
+    "sports_evidence_families_min": 5,
+    "required_families": ["STARTER_PROFILE", "OFFENSE_PROFILE", "BULLPEN_CONTEXT", "DEEP_VERIFICATION", "FINAL_FRESHNESS"],
+    "source_origins_min": 2,
+    "used_domains_min": 2,
+    "source_ledger_required": true,
+    "orphan_web_events_allowed": 0,
+    "unsourced_active_claims_allowed": 0,
+    "unreferenced_active_claims_allowed": 0
+  },
+  "web_guard": {
+    "market_inputs_used_metadata_must_be_false": true,
+    "deep_verification_requires_prior_precommit": true,
+    "final_freshness_requires_F8_PASS_and_F9_T100_card": true,
+    "external_research_after_F9_PASS_forbidden": true
+  },
+  "hashes": {
+    "claim_trace_includes_parent_claim_ids": true,
+    "claim_trace_includes_f6_precommits": true,
+    "claim_trace_includes_f9_pre_reviews": true,
+    "phase_hash_database_derived": true,
+    "packet_hash_database_derived": true
+  },
+  "database_audit": {
+    "control": "DATABASE_CONTROL_V07",
+    "requires_5_evidence_families": true,
+    "requires_min_2_source_origins": true,
+    "requires_min_2_used_domains": true,
+    "requires_exact_10_active_game_claims": true,
+    "requires_8_claim_phase_coverage": true,
+    "requires_zero_parentless_synthesis_claims": true,
+    "requires_f6_precommit": true,
+    "requires_f9_pre_review": true,
+    "requires_final_freshness": true,
+    "requires_comparative_rank": true,
+    "requires_verified_drive_packet": true
+  },
+  "trust_boundary": {
+    "provider_cryptographic_attestation": false,
+    "external_connector_trust_boundary": "OPERATIONAL_TRACE_NOT_PROVIDER_SIGNED"
+  },
+  "terminal": {
+    "post_F9_external_research_requires_new_run": true,
+    "completed_and_audit_only_semantic_trace_immutable": true,
+    "handoff_pass_immutable": true,
+    "missed_earliest_first_pitch": "DEPURATION_INCOMPLETE — NO HANDOFF"
+  },
+  "validation": {
+    "required": "CONTROLLED_E2E_F0_F10_PLUS_ADVERSARIAL_PLUS_TERMINAL_PLUS_CROSS_SYSTEM_READBACK",
+    "current_state": "PENDING"
+  }
+}
