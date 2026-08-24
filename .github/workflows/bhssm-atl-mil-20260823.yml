@@ -5,6 +5,10 @@ on:
     paths:
       - 'scripts/bhssm_atl_mil_20260823.py'
       - '.github/workflows/bhssm-atl-mil-20260823.yml'
+  pull_request:
+    paths:
+      - 'scripts/bhssm_atl_mil_20260823.py'
+      - '.github/workflows/bhssm-atl-mil-20260823.yml'
   workflow_dispatch:
 
 permissions:
@@ -48,6 +52,7 @@ jobs:
         run: python scripts/bhssm_atl_mil_20260823.py
 
       - name: Commit auditable outputs
+        if: github.event_name == 'push'
         run: |
           git config user.name 'BHSSM Automation'
           git config user.email 'actions@users.noreply.github.com'
