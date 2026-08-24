@@ -22,7 +22,7 @@ jobs:
       SOURCE_COMMIT: 573adf2c9ea7417589ac37cbd47b839f7700db49
       SOURCE_COMMIT_TIME: '2026-08-23T22:52:27Z'
       SOURCE_DIR: source-data
-      RUN_REQUEST_ID: '2026-08-23T20-20-EDT'
+      RUN_REQUEST_ID: '2026-08-23T20-OBSERVABLE-PR'
     steps:
       - name: Checkout kernel
         uses: actions/checkout@v4
