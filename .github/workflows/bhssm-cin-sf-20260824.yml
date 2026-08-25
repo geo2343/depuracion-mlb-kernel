@@ -1,5 +1,6 @@
 name: BHSSM CIN-SF 2026-08-24
 
+# Final strict-audit workflow: execution success is not certification success.
 on:
   pull_request:
     paths:
