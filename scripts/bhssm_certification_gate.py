@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Strict post-execution certification gate for BHSSM.
 
-This step separates successfully computed diagnostic candidates from outputs
-that the BHSSM contract is allowed to certify. It intentionally fails closed:
-if temporal validation, leakage, missing-data, regime, reclassification,
-false-positive, false-negative, reproducibility, or threshold precommitment do
-not all pass, candidate change points/versions remain diagnostic only and the
-sovereign registries are emitted empty.
+Separates computed diagnostics from outputs the BHSSM contract may certify.
+The gate fails closed: if any required certification control is not PASS,
+change points, historical versions and temporal patterns remain diagnostic only;
+CVD handoff is blocked and no downstream current-version claim is authorized.
 """
 from __future__ import annotations
 
@@ -21,6 +19,9 @@ AUDIT_PATH = OUT / "BHSSM_AUDIT.json"
 CONFIG_PATH = OUT / "BHSSM_ENGINE_CONFIG.json"
 CP_PATH = OUT / "CHANGE_POINT_REGISTRY.csv"
 VM_PATH = OUT / "HISTORICAL_VERSION_MAP.csv"
+PATTERN_PATH = OUT / "PATTERN_REGISTRY.csv"
+HISTORY_PATH = OUT / "AS_OF_FILTERED_HISTORY.csv"
+MANIFEST_PATH = OUT / "SOURCE_MANIFEST.json"
 REPORT_PATH = OUT / "REPORT.md"
 
 
@@ -32,24 +33,51 @@ def dump_json(obj, path: Path):
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-def preserve_candidates(path: Path, candidate_name: str):
+def preserve_candidates(path: Path, candidate_name: str, empty_authoritative: bool = True):
     if not path.exists():
-        return 0, []
+        return 0
     df = pd.read_csv(path)
-    candidate_path = OUT / candidate_name
-    df.to_csv(candidate_path, index=False)
-    # Keep the sovereign registry schema but remove uncertified rows.
-    pd.DataFrame(columns=df.columns).to_csv(path, index=False)
-    return len(df), list(df.columns)
+    df.to_csv(OUT / candidate_name, index=False)
+    if empty_authoritative:
+        pd.DataFrame(columns=df.columns).to_csv(path, index=False)
+    return len(df)
+
+
+def history_coverage():
+    history = pd.read_csv(HISTORY_PATH) if HISTORY_PATH.exists() else pd.DataFrame()
+    manifest = load_json(MANIFEST_PATH) if MANIFEST_PATH.exists() else {"target_batters": []}
+    rows = []
+    for p in manifest.get("target_batters", []):
+        bid = int(p["id"])
+        h = history[history["batter_id"].eq(bid)] if not history.empty else pd.DataFrame()
+        checkpoints = int(len(h))
+        rows.append({
+            "batter_id": bid,
+            "batter": p["name"],
+            "team": p["team"],
+            "technical_state_checkpoints": checkpoints,
+            "change_detection_eligible": checkpoints >= 3,
+            "latest_as_of": None if h.empty else str(h["as_of"].max()),
+            "minimum_sample_authority": None if h.empty else float(h["sample_authority"].min()),
+            "median_sample_authority": None if h.empty else float(h["sample_authority"].median()),
+        })
+    insufficient = [r for r in rows if not r["change_detection_eligible"]]
+    obj = {
+        "target_batters": len(rows),
+        "change_detection_eligible_batters": len(rows) - len(insufficient),
+        "insufficient_history_batters": insufficient,
+        "players": rows,
+    }
+    dump_json(obj, OUT / "LINEUP_STATE_HISTORY_COVERAGE.json")
+    return obj
 
 
 def main():
     audit = load_json(AUDIT_PATH)
     config = load_json(CONFIG_PATH)
     tests = dict(audit.get("tests", {}))
+    coverage = history_coverage()
 
-    # Contract-level certification tests. NO_FUTURE_DATA is the implemented
-    # no-leakage/timestamp-firewall test in this runner.
     required = {
         "TEMPORAL_OUT_OF_SAMPLE_TEST": tests.get("TEMPORAL_OUT_OF_SAMPLE_TEST", "MISSING"),
         "NO_LEAKAGE_TEST": tests.get("NO_FUTURE_DATA", "MISSING"),
@@ -61,43 +89,66 @@ def main():
         "REPRODUCIBILITY_TEST": tests.get("REPRODUCIBILITY_TEST", "MISSING"),
     }
 
-    # The current config was selected/calibrated in this game-specific run.
-    # It is reproducibly frozen after calibration, but it was not a separately
-    # certified, pre-existing engine artifact before CIN@SF was analyzed.
+    # Game-specific calibration is reproducibly frozen after it is estimated,
+    # but it is not a separately certified engine configuration precommitted
+    # before CIN@SF. The contract does not permit such thresholds to become
+    # sovereign simply because the current run completed.
     required["THRESHOLD_PRECOMMITMENT_TEST"] = "FAIL"
 
-    # The execution log showed convergence warnings from the context logistic
-    # models. Warnings do not invalidate raw ingestion, but a fully certified
-    # context layer cannot be claimed until convergence is explicitly checked.
+    # The execution log emits LogisticRegression ConvergenceWarning messages.
+    # Raw products remain auditable, but the context layer is not fully certified.
     required["CONTEXT_MODEL_CONVERGENCE_TEST"] = "LIMITED"
+
+    # All 18 hitters occur in raw source data, but that is not equivalent to
+    # enough technical-state history. Fewer than three checkpoints cannot enter
+    # the change detector used by this implementation.
+    required["LINEUP_STATE_HISTORY_COVERAGE_TEST"] = (
+        "PASS" if not coverage["insufficient_history_batters"] else "LIMITED"
+    )
+
+    # Current pattern validation pools overlapping rolling checkpoints and uses
+    # ordinary Spearman tests. Until dependence/repeated-measures structure is
+    # handled explicitly, small p-values are not sufficient for sovereign status.
+    required["PATTERN_DEPENDENCE_AWARE_VALIDATION_TEST"] = "LIMITED"
 
     failures = [k for k, v in required.items() if v != "PASS"]
     gate = "PASS" if not failures else "FAIL"
 
-    cp_count, _ = preserve_candidates(
-        CP_PATH, "CHANGE_POINT_CANDIDATES_UNCERTIFIED.csv"
-    )
-    version_count, _ = preserve_candidates(
-        VM_PATH, "HISTORICAL_VERSION_CANDIDATES_UNCERTIFIED.csv"
+    cp_count = preserve_candidates(CP_PATH, "CHANGE_POINT_CANDIDATES_UNCERTIFIED.csv")
+    version_count = preserve_candidates(VM_PATH, "HISTORICAL_VERSION_CANDIDATES_UNCERTIFIED.csv")
+    pattern_count = preserve_candidates(PATTERN_PATH, "PATTERN_CANDIDATES_UNCERTIFIED.csv")
+    # Keep history physically available for audit, while explicitly withholding
+    # sovereign/CVD authority when the certification gate fails.
+    history_count = preserve_candidates(
+        HISTORY_PATH, "AS_OF_FILTERED_HISTORY_UNCERTIFIED.csv", empty_authoritative=False
     )
 
     audit["certification_tests"] = required
     audit["MODEL_CERTIFICATION_GATE"] = gate
     audit["CERTIFICATION_GAPS"] = failures
+    audit["lineup_state_history_coverage"] = coverage
     audit["candidate_outputs"] = {
+        "technical_history_rows_computed": history_count,
         "change_points_computed": cp_count,
         "historical_version_rows_computed": version_count,
+        "temporal_patterns_computed": pattern_count,
+        "technical_history_file": "AS_OF_FILTERED_HISTORY_UNCERTIFIED.csv",
         "change_point_file": "CHANGE_POINT_CANDIDATES_UNCERTIFIED.csv",
         "historical_version_file": "HISTORICAL_VERSION_CANDIDATES_UNCERTIFIED.csv",
+        "pattern_file": "PATTERN_CANDIDATES_UNCERTIFIED.csv",
         "status": "DIAGNOSTIC_ONLY_NOT_AUTHORIZED",
     }
+    audit["AS_OF_FILTERED_HISTORY_STATUS"] = "COMPUTED_NOT_CERTIFIED_FOR_CVD"
     audit["CHANGE_POINT_REGISTRY_STATUS"] = "NOT_AUTHORIZED"
     audit["HISTORICAL_VERSION_MAP_STATUS"] = "NOT_AUTHORIZED"
+    audit["PATTERN_REGISTRY_STATUS"] = "NOT_AUTHORIZED"
     audit["HANDOFF_TO_CVD"] = "BLOCKED"
     audit["BHSSM_STATISTICAL_AUDIT"] = "FAIL"
     audit["BHSSM_EXECUTION_STATUS"] = "BLOCKED_BY_MODEL_CERTIFICATION"
+    audit["AUTHORITY_FIREWALL"]["CANDIDATE_TECHNICAL_HISTORY"] = "DIAGNOSTIC_ONLY"
     audit["AUTHORITY_FIREWALL"]["CANDIDATE_CHANGE_POINTS"] = "DIAGNOSTIC_ONLY"
     audit["AUTHORITY_FIREWALL"]["CANDIDATE_HISTORICAL_VERSIONS"] = "DIAGNOSTIC_ONLY"
+    audit["AUTHORITY_FIREWALL"]["CANDIDATE_PATTERNS"] = "DIAGNOSTIC_ONLY"
 
     config["status"] = "CANDIDATE_FROZEN_NOT_CERTIFIED"
     config["certification_gate"] = gate
@@ -113,8 +164,11 @@ def main():
             "gaps": failures,
             "authorized_change_points": 0,
             "authorized_historical_versions": 0,
+            "authorized_temporal_patterns": 0,
             "candidate_change_points": cp_count,
             "candidate_historical_version_rows": version_count,
+            "candidate_temporal_patterns": pattern_count,
+            "technical_history_rows_computed": history_count,
             "handoff_to_cvd": "BLOCKED",
         },
         OUT / "MODEL_CERTIFICATION_GATE.json",
@@ -125,20 +179,32 @@ def main():
         f.write(f"- MODEL_CERTIFICATION_GATE: **{gate}**\n")
         f.write("- BHSSM_STATISTICAL_AUDIT: **FAIL**\n")
         f.write("- BHSSM_EXECUTION_STATUS: **BLOCKED_BY_MODEL_CERTIFICATION**\n")
+        f.write(f"- Technical-history rows computed: {history_count} (diagnostic/not certified for CVD)\n")
         f.write(f"- Diagnostic change-point candidates: {cp_count}\n")
         f.write(f"- Diagnostic historical-version rows: {version_count}\n")
+        f.write(f"- Diagnostic temporal-pattern candidates: {pattern_count}\n")
         f.write("- Authorized CHANGE_POINT_REGISTRY rows: 0\n")
         f.write("- Authorized HISTORICAL_VERSION_MAP rows: 0\n")
+        f.write("- Authorized PATTERN_REGISTRY rows: 0\n")
         f.write("- HANDOFF_TO_CVD: **BLOCKED**\n")
         f.write("- Certification gaps: " + ", ".join(failures) + "\n")
+        if coverage["insufficient_history_batters"]:
+            names = ", ".join(
+                f"{r['batter']} ({r['technical_state_checkpoints']} checkpoints)"
+                for r in coverage["insufficient_history_batters"]
+            )
+            f.write("- Insufficient state-history coverage: " + names + "\n")
 
     print(json.dumps({
         "MODEL_CERTIFICATION_GATE": gate,
         "gaps": failures,
         "candidate_change_points": cp_count,
         "candidate_version_rows": version_count,
+        "candidate_patterns": pattern_count,
         "authorized_change_points": 0,
         "authorized_versions": 0,
+        "authorized_patterns": 0,
+        "insufficient_history_batters": coverage["insufficient_history_batters"],
         "execution": audit["BHSSM_EXECUTION_STATUS"],
     }, indent=2))
 
