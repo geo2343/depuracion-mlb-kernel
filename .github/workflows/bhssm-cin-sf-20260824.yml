@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'scripts/bhssm_cin_sf_20260824.py'
+      - 'scripts/bhssm_certification_gate.py'
       - '.github/workflows/bhssm-cin-sf-20260824.yml'
   workflow_dispatch:
 
@@ -43,6 +44,11 @@ jobs:
 
       - name: Execute BHSSM CIN-SF
         run: python scripts/bhssm_cin_sf_20260824.py
+
+      - name: Enforce strict BHSSM certification gate
+        env:
+          BHSSM_OUTPUT_DIR: bhssm_outputs/CIN_SF_2026-08-24
+        run: python scripts/bhssm_certification_gate.py
 
       - name: Upload auditable outputs
         uses: actions/upload-artifact@v4
