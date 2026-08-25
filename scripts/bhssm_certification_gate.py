@@ -2,9 +2,10 @@
 """Strict post-execution certification gate for BHSSM.
 
 Separates computed diagnostics from outputs the BHSSM contract may certify.
-The gate fails closed: if any required certification control is not PASS,
-change points, historical versions and temporal patterns remain diagnostic only;
-CVD handoff is blocked and no downstream current-version claim is authorized.
+The gate fails closed: successful code execution is not model certification.
+If a required statistical, data, governance, or implementation control is not
+PASS, change points, historical versions and temporal patterns remain diagnostic
+only; CVD handoff and every downstream current-version/probability claim are blocked.
 """
 from __future__ import annotations
 
@@ -78,37 +79,63 @@ def main():
     tests = dict(audit.get("tests", {}))
     coverage = history_coverage()
 
+    # Controls with direct evidence from the executed run.
     required = {
         "TEMPORAL_OUT_OF_SAMPLE_TEST": tests.get("TEMPORAL_OUT_OF_SAMPLE_TEST", "MISSING"),
         "NO_LEAKAGE_TEST": tests.get("NO_FUTURE_DATA", "MISSING"),
         "MISSING_DATA_TEST": tests.get("MISSING_DATA_TEST", "MISSING"),
-        "REGIME_CHANGE_TEST": tests.get("REGIME_CHANGE_TEST", "MISSING"),
-        "PITCH_RECLASSIFICATION_TEST": tests.get("PITCH_RECLASSIFICATION_TEST", "MISSING"),
         "FALSE_POSITIVE_TEST": tests.get("FALSE_POSITIVE_TEST", "MISSING"),
         "FALSE_NEGATIVE_TEST": tests.get("FALSE_NEGATIVE_TEST", "MISSING"),
         "REPRODUCIBILITY_TEST": tests.get("REPRODUCIBILITY_TEST", "MISSING"),
     }
 
-    # Game-specific calibration is reproducibly frozen after it is estimated,
-    # but it is not a separately certified engine configuration precommitted
-    # before CIN@SF. The contract does not permit such thresholds to become
-    # sovereign simply because the current run completed.
+    # The initial runner over-labelled several controls. These are downgraded
+    # because inspection of the implementation shows that the named contractual
+    # test was not actually executed in full.
+    required["REGIME_CHANGE_PERTURBATION_TEST"] = "LIMITED"
+    required["PITCH_RECLASSIFICATION_ROBUSTNESS_TEST"] = "LIMITED"
+
+    # The game-specific thresholds were selected inside the CIN@SF execution.
+    # Freezing after selection is reproducibility, not precommitment.
     required["THRESHOLD_PRECOMMITMENT_TEST"] = "FAIL"
 
-    # The execution log emits LogisticRegression ConvergenceWarning messages.
-    # Raw products remain auditable, but the context layer is not fully certified.
+    # Execution logs emitted LogisticRegression ConvergenceWarning messages.
     required["CONTEXT_MODEL_CONVERGENCE_TEST"] = "LIMITED"
 
-    # All 18 hitters occur in raw source data, but that is not equivalent to
-    # enough technical-state history. Fewer than three checkpoints cannot enter
-    # the change detector used by this implementation.
+    # The context model implements pitch family, velocity/movement/location,
+    # pitcher hand, count and a prior pitcher-quality proxy, but does not fully
+    # implement every relevant optional/competitive context specified by the
+    # contract (park/game state, starter-reliever, catcher, defense when relevant).
+    required["CONTEXT_COVARIATE_COMPLETENESS_TEST"] = "LIMITED"
+
+    # The implemented state construction uses rolling residual averages and
+    # standardized composite states. It does not yet realize the complete
+    # hierarchical Beta/Logistic-Binomial and robust Student-t posterior layer
+    # contemplated by the BHSSM statistical contract.
+    required["HIERARCHICAL_METRIC_MODEL_COMPLIANCE_TEST"] = "LIMITED"
+    required["LATENT_STATE_POSTERIOR_MODEL_TEST"] = "LIMITED"
+    required["STATE_UNCERTAINTY_CALIBRATION_TEST"] = "LIMITED"
+
+    # The version duration gate enforces minimum checkpoints but is explicitly
+    # a semi-Markov-like rule, not a fully fitted semi-Markov duration model.
+    required["VERSION_DURATION_MODEL_COMPLIANCE_TEST"] = "LIMITED"
+
+    # Exposure-shift counterevidence is tested, but injury/IL, playing-time,
+    # platoon and lineup-role competitor hypotheses are not ingested here.
+    required["HEALTH_ROLE_COUNTEREVIDENCE_TEST"] = "LIMITED"
+
+    # Swing-mechanics atomic fields and deep expected BIP conversion are absent
+    # from the frozen source at the authority required by the contract.
+    required["SWING_MECHANICS_ATOMIC_TEST"] = tests.get("SWING_MECHANICS_ATOMIC", "MISSING")
+    required["BIP_EXPECTED_CONVERSION_ATOMIC_TEST"] = tests.get("BIP_EXPECTED_CONVERSION_ATOMIC", "MISSING")
+
     required["LINEUP_STATE_HISTORY_COVERAGE_TEST"] = (
         "PASS" if not coverage["insufficient_history_batters"] else "LIMITED"
     )
 
-    # Current pattern validation pools overlapping rolling checkpoints and uses
-    # ordinary Spearman tests. Until dependence/repeated-measures structure is
-    # handled explicitly, small p-values are not sufficient for sovereign status.
+    # Pattern discovery pools overlapping rolling checkpoints/repeated measures.
+    # FDR correction over four p-values does not by itself solve within-player
+    # dependence; dependence-aware temporal validation is still required.
     required["PATTERN_DEPENDENCE_AWARE_VALIDATION_TEST"] = "LIMITED"
 
     failures = [k for k, v in required.items() if v != "PASS"]
@@ -117,12 +144,19 @@ def main():
     cp_count = preserve_candidates(CP_PATH, "CHANGE_POINT_CANDIDATES_UNCERTIFIED.csv")
     version_count = preserve_candidates(VM_PATH, "HISTORICAL_VERSION_CANDIDATES_UNCERTIFIED.csv")
     pattern_count = preserve_candidates(PATTERN_PATH, "PATTERN_CANDIDATES_UNCERTIFIED.csv")
-    # Keep history physically available for audit, while explicitly withholding
-    # sovereign/CVD authority when the certification gate fails.
     history_count = preserve_candidates(
         HISTORY_PATH, "AS_OF_FILTERED_HISTORY_UNCERTIFIED.csv", empty_authoritative=False
     )
 
+    audit["initial_runner_audit_label"] = audit.get("BHSSM_STATISTICAL_AUDIT")
+    audit["initial_runner_execution_label"] = audit.get("BHSSM_EXECUTION_STATUS")
+    audit["initial_pass_labels_overridden_by_external_code_audit"] = [
+        "REGIME_CHANGE_TEST",
+        "PITCH_RECLASSIFICATION_TEST",
+        "COUNTEREVIDENCE_SEARCHED",
+        "VERSION_DURATION_CONTROLLED",
+        "CONTEXT_MODEL_APPLIED",
+    ]
     audit["certification_tests"] = required
     audit["MODEL_CERTIFICATION_GATE"] = gate
     audit["CERTIFICATION_GAPS"] = failures
@@ -175,7 +209,7 @@ def main():
     )
 
     with REPORT_PATH.open("a", encoding="utf-8") as f:
-        f.write("\n\n## Strict certification gate\n\n")
+        f.write("\n\n## Strict external certification gate\n\n")
         f.write(f"- MODEL_CERTIFICATION_GATE: **{gate}**\n")
         f.write("- BHSSM_STATISTICAL_AUDIT: **FAIL**\n")
         f.write("- BHSSM_EXECUTION_STATUS: **BLOCKED_BY_MODEL_CERTIFICATION**\n")
