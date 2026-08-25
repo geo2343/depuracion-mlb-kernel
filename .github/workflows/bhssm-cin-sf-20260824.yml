@@ -1,0 +1,59 @@
+name: BHSSM CIN-SF 2026-08-24
+
+# Final strict-audit workflow: execution success is not certification success.
+on:
+  pull_request:
+    paths:
+      - 'scripts/bhssm_cin_sf_20260824.py'
+      - 'scripts/bhssm_certification_gate.py'
+      - '.github/workflows/bhssm-cin-sf-20260824.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  execute-bhssm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_COMMIT: dc36be0d29c98f75a80889e413cdf8ce405ad05b
+      SOURCE_COMMIT_TIME: '2026-08-24T23:27:04Z'
+      SOURCE_DIR: source-data
+    steps:
+      - name: Checkout kernel
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install statistical dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas pyarrow numpy scipy scikit-learn ruptures
+
+      - name: Fetch sovereign pregame source snapshot
+        run: |
+          rm -rf source-data
+          git init source-data
+          git -C source-data remote add origin https://github.com/lancebroz/mlb-pitcher-data.git
+          git -C source-data fetch --depth=1 origin "$SOURCE_COMMIT"
+          git -C source-data checkout --detach FETCH_HEAD
+          printf 'SOURCE_HEAD=%s\n' "$(git -C source-data rev-parse HEAD)"
+
+      - name: Execute BHSSM CIN-SF
+        run: python scripts/bhssm_cin_sf_20260824.py
+
+      - name: Enforce strict BHSSM certification gate
+        env:
+          BHSSM_OUTPUT_DIR: bhssm_outputs/CIN_SF_2026-08-24
+        run: python scripts/bhssm_certification_gate.py
+
+      - name: Upload auditable outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: bhssm-cin-sf-20260824
+          path: bhssm_outputs/CIN_SF_2026-08-24
+          if-no-files-found: error
