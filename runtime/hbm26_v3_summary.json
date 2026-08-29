@@ -1,0 +1,47 @@
+{
+  "start": "2026-03-25",
+  "end": "2026-04-11",
+  "unique_games": 218,
+  "registry_duplicate_game_pk": 0,
+  "game_pk_with_multiple_final_dates": 0,
+  "duplicate_appearance_keys": 0,
+  "pitch_mismatches": 0,
+  "team_line_failures": 0,
+  "dates_review": 0,
+  "fallback_games": 7,
+  "all_pitcher_appearances": 1904,
+  "bullpen_appearances": 1460,
+  "position_player_exclusions": 8,
+  "prior_v2_rows_expected": 1353,
+  "prior_v3_rows_actual": 1353,
+  "prior_integrity_match": true,
+  "date_0411": {
+    "date": "2026-04-11",
+    "games": 15,
+    "pitch_rows": 4570,
+    "box_pitch_sum": 4570,
+    "pitch_delta": 0,
+    "mismatches": 0,
+    "fallback_games": 0,
+    "fallback_game_pks": "",
+    "team_line_failures": 0,
+    "status": "PASS"
+  },
+  "bullpen_0411": 107,
+  "exclusions_0411": 0,
+  "review_rows_0411": 0,
+  "extra_loads": [
+    {
+      "pitcher_id": 592094,
+      "pitcher_name": "Jason Adam",
+      "date": "2026-04-05",
+      "game_pk": 814796,
+      "pitches": 17,
+      "bf": null,
+      "outs": null,
+      "role": "REHAB_RELIEF",
+      "level": "MILB_REHAB",
+      "source": "https://baseballsavant.mlb.com/player-scroll/game?gamePk=814796&player_id=592094"
+    }
+  ]
+}

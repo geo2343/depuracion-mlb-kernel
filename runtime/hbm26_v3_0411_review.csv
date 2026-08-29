@@ -1,0 +1,1 @@
+pitcher_id,pbp_pitches,entry_inning,first_play_index,last_play_index,first_pitch_row,last_pitch_row,entry_half,game_pk,pbp_source,fallback_used,date,game_date_time,team,opp,home_away,pitcher_name,is_starter,role,boxscore_np,bf,outs,r,er,h,bb,k,hr,boxscore_source,_merge,pitch_count_match,primary_position,primary_position_name,pitcher_class,line_stats_match,qa_status
