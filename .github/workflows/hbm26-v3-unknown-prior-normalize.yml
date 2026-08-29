@@ -24,30 +24,48 @@ jobs:
           import json
           from pathlib import Path
           import pandas as pd
+
           OUT=Path('runtime'); DATE='2026-04-11'
           files=['hbm26_v3_sheet01_0411.csv','hbm26_v3_0411_bullpen.csv','hbm26_v3_bullpen.csv','hbm26_v3_nonstarters.csv','hbm26_v3_workload_all_pitchers.csv']
           derived=['PITCHES_2D','PITCHES_3D','BF_2D','BF_3D','B2B','THREE_DAYS_3','SAME_DAY_REPEAT']
           report={}
+
           for name in files:
-              p=OUT/name; df=pd.read_csv(p)
+              p=OUT/name
+              df=pd.read_csv(p)
               mask=(df['FECHA'].astype(str)==DATE) & df['PREV_PITCHES'].isna() & df['PREV_ROLE'].isna() & df['PREV_APPEARANCE_LEVEL'].isna()
               ids=df.loc[mask,'RELIEVER_APPEARANCE_ID'].astype(str).tolist()
               for c in derived:
-                  if c in df.columns: df.loc[mask,c]=pd.NA
+                  if c not in df.columns:
+                      continue
+                  # Preserve UNKNOWN as a blank value. Boolean columns must be
+                  # widened before assigning None, otherwise pandas rejects NaN.
+                  if pd.api.types.is_bool_dtype(df[c].dtype):
+                      df[c]=df[c].astype('object')
+                  df.loc[mask,c]=None
               df.to_csv(p,index=False)
               report[name]={'rows_normalized':int(mask.sum()),'ids':ids}
+
           sheet_ids=report['hbm26_v3_sheet01_0411.csv']['ids']
           expected={'823644-518886','823074-694363'}
           status='PASS' if set(sheet_ids)==expected and len(sheet_ids)==2 else 'QA_REVIEW'
-          summary={'date':DATE,'rule':'UNKNOWN != 0/FALSE when prior competitive history is not established','sheet_rows_normalized':len(sheet_ids),'sheet_ids':sheet_ids,'files':report,'status':status}
+          summary={
+              'date':DATE,
+              'rule':'UNKNOWN != 0/FALSE when prior competitive history is not established',
+              'sheet_rows_normalized':len(sheet_ids),
+              'sheet_ids':sheet_ids,
+              'files':report,
+              'status':status
+          }
           (OUT/'hbm26_v3_unknown_prior_normalization.json').write_text(json.dumps(summary,indent=2),encoding='utf-8')
           print(json.dumps(summary,indent=2))
-          if status!='PASS': raise SystemExit('Unexpected unknown-prior population')
+          if status!='PASS':
+              raise SystemExit('Unexpected unknown-prior population')
           PY
       - name: Commit normalized V3 sources
         if: always()
         run: |
           git config user.name 'hbm26-qa-bot'
           git config user.email 'hbm26-qa-bot@users.noreply.github.com'
-          git add runtime/hbm26_v3_sheet01_0411.csv runtime/hbm26_v3_0411_bullpen.csv runtime/hbm26_v3_bullpen.csv runtime/hbm26_v3_nonstarters.csv runtime/hbm26_v3_workload_all_pitchers.csv runtime/hbm26_v3_unknown_prior_normalization.json
+          git add runtime/hbm26_v3_sheet01_0411.csv runtime/hbm26_v3_0411_bullpen.csv runtime/hbm26_v3_bullpen.csv runtime/hbm26_v3_nonstarters.csv runtime/hbm26_v3_workload_all_pitchers.csv runtime/hbm26_v3_unknown_prior_normalization.json || true
           if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: preserve UNKNOWN prior workload on 2026-04-11'; git push; fi
