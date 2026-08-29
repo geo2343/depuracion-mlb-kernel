@@ -14,14 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Install dependencies
         run: pip install --quiet pandas pyarrow requests
-
       - name: Reconcile Apr 10 PBP by pitcher
         shell: bash
         run: |
@@ -34,39 +31,31 @@ jobs:
           DATE = '2026-04-10'
           GAME_PKS = [824695,823482,824297,824534,822829,822997,823643,824858,824941,823808,824128,823076,823156,823318,823968]
           PARQUET_URL = 'https://raw.githubusercontent.com/lancebroz/mlb-pitcher-data/main/data/raw/2026/daily/2026-04-10.parquet'
-          outdir = Path('runtime')
-          outdir.mkdir(exist_ok=True)
+          outdir = Path('runtime'); outdir.mkdir(exist_ok=True)
           parquet_path = outdir / 'hbm26_2026-04-10.parquet'
 
-          r = requests.get(PARQUET_URL, timeout=60)
-          r.raise_for_status()
-          parquet_path.write_bytes(r.content)
+          def outs_from_ip(ip):
+              s = str(ip or '0.0')
+              whole, _, frac = s.partition('.')
+              return int(whole) * 3 + int(frac[:1] or 0)
 
+          r = requests.get(PARQUET_URL, timeout=60); r.raise_for_status(); parquet_path.write_bytes(r.content)
           cols = ['game_pk','pitcher_id','pitcher_name','inning','top_bottom','at_bat_number','pitch_number']
           df = pd.read_parquet(parquet_path, columns=cols)
           df['game_pk'] = pd.to_numeric(df['game_pk'], errors='raise').astype('int64')
           df['pitcher_id'] = pd.to_numeric(df['pitcher_id'], errors='raise').astype('int64')
           df['_row_in_game'] = df.groupby('game_pk').cumcount() + 1
-
           pbp = (df.groupby(['game_pk','pitcher_id','pitcher_name'], as_index=False)
-                   .agg(pbp_pitches=('pitch_number','size'),
-                        entry_inning=('inning','min'),
-                        first_play_index=('at_bat_number','min'),
-                        last_play_index=('at_bat_number','max'),
-                        first_pitch_row=('_row_in_game','min'),
-                        last_pitch_row=('_row_in_game','max')))
-
-          first_rows = (df.sort_values(['game_pk','_row_in_game'])
-                          .drop_duplicates(['game_pk','pitcher_id'])
-                          [['game_pk','pitcher_id','top_bottom']]
-                          .rename(columns={'top_bottom':'entry_half'}))
+                   .agg(pbp_pitches=('pitch_number','size'), entry_inning=('inning','min'),
+                        first_play_index=('at_bat_number','min'), last_play_index=('at_bat_number','max'),
+                        first_pitch_row=('_row_in_game','min'), last_pitch_row=('_row_in_game','max')))
+          first_rows = (df.sort_values(['game_pk','_row_in_game']).drop_duplicates(['game_pk','pitcher_id'])
+                          [['game_pk','pitcher_id','top_bottom']].rename(columns={'top_bottom':'entry_half'}))
           pbp = pbp.merge(first_rows, on=['game_pk','pitcher_id'], how='left')
 
-          box_rows = []
-          total_box_pitches = 0
+          box_rows=[]; total_box_pitches=0
           for game_pk in GAME_PKS:
-              url = f'https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live'
-              feed = requests.get(url, timeout=60).json()
+              feed = requests.get(f'https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live', timeout=60).json()
               for side in ('away','home'):
                   team = feed['liveData']['boxscore']['teams'][side]
                   pitcher_order = team.get('pitchers', [])
@@ -75,66 +64,53 @@ jobs:
                       pobj = team['players'].get(f'ID{pid}', {})
                       stat = pobj.get('stats', {}).get('pitching', {})
                       np = stat.get('numberOfPitches')
-                      if np is None:
-                          continue
+                      if np is None: continue
                       total_box_pitches += int(np)
+                      pos = pobj.get('position', {}) or {}
+                      is_starter = bool(pid == starter)
+                      pitcher_class = 'STARTER' if is_starter else ('BULLPEN_PITCHER' if pos.get('abbreviation') == 'P' else 'POSITION_PLAYER_PITCHING')
                       box_rows.append({
-                          'game_pk': int(game_pk),
-                          'pitcher_id': int(pid),
-                          'boxscore_name': pobj.get('person', {}).get('fullName'),
-                          'boxscore_np': int(np),
-                          'is_starter': bool(pid == starter),
-                          'team_side': side,
+                          'game_pk':int(game_pk),'pitcher_id':int(pid),'boxscore_name':pobj.get('person',{}).get('fullName'),
+                          'boxscore_np':int(np),'is_starter':is_starter,'team_side':side,
+                          'primary_position':pos.get('abbreviation'),'pitcher_class':pitcher_class,
+                          'box_bf':int(stat.get('battersFaced') or 0),'box_outs':outs_from_ip(stat.get('inningsPitched')),
+                          'box_r':int(stat.get('runs') or 0),'box_er':int(stat.get('earnedRuns') or 0),
+                          'box_h':int(stat.get('hits') or 0),'box_bb':int(stat.get('baseOnBalls') or 0),
+                          'box_k':int(stat.get('strikeOuts') or 0),'box_hr':int(stat.get('homeRuns') or 0)
                       })
+          box=pd.DataFrame(box_rows)
+          recon=pbp.merge(box,on=['game_pk','pitcher_id'],how='outer',indicator=True)
+          recon['pitch_count_match']=recon['pbp_pitches'].eq(recon['boxscore_np'])
+          recon['name_match']=recon['pitcher_name'].fillna('').str.casefold().eq(recon['boxscore_name'].fillna('').str.casefold())
+          recon['date']=DATE
+          recon['qa_status']=recon.apply(lambda x:'QA_VALIDATED' if x['_merge']=='both' and bool(x['pitch_count_match']) else 'QA_MISMATCH',axis=1)
+          order=['date','game_pk','pitcher_id','pitcher_name','boxscore_name','is_starter','team_side','primary_position','pitcher_class',
+                 'entry_inning','entry_half','first_play_index','last_play_index','first_pitch_row','last_pitch_row','pbp_pitches','boxscore_np',
+                 'pitch_count_match','box_bf','box_outs','box_r','box_er','box_h','box_bb','box_k','box_hr','name_match','qa_status','_merge']
+          recon[order].sort_values(['game_pk','team_side','is_starter','pitcher_id']).to_csv(outdir/'hbm26_apr10_pitcher_reconciliation.csv',index=False)
 
-          box = pd.DataFrame(box_rows)
-          recon = pbp.merge(box, on=['game_pk','pitcher_id'], how='outer', indicator=True)
-          recon['pitch_count_match'] = recon['pbp_pitches'].eq(recon['boxscore_np'])
-          recon['name_match'] = recon['pitcher_name'].fillna('').str.casefold().eq(recon['boxscore_name'].fillna('').str.casefold())
-          recon['date'] = DATE
-          recon['qa_status'] = recon.apply(
-              lambda x: 'QA_VALIDATED' if x['_merge']=='both' and bool(x['pitch_count_match']) else 'QA_MISMATCH', axis=1)
-
-          order = ['date','game_pk','pitcher_id','pitcher_name','boxscore_name','is_starter','team_side',
-                   'entry_inning','entry_half','first_play_index','last_play_index','first_pitch_row','last_pitch_row',
-                   'pbp_pitches','boxscore_np','pitch_count_match','name_match','qa_status','_merge']
-          recon[order].sort_values(['game_pk','team_side','is_starter','pitcher_id']).to_csv(
-              outdir / 'hbm26_apr10_pitcher_reconciliation.csv', index=False)
-
-          relief = recon[(recon['is_starter'] == False) & (recon['_merge'] == 'both')].copy()
-          relief['lookup_key'] = relief['game_pk'].astype('int64').astype(str) + '|' + relief['pitcher_name']
-          compact = ['lookup_key','game_pk','pitcher_id','pitcher_name','entry_inning','entry_half',
-                     'first_play_index','last_play_index','pbp_pitches','boxscore_np','pitch_count_match','qa_status']
-          relief[compact].sort_values(['game_pk','pitcher_name']).to_csv(
-              outdir / 'hbm26_apr10_relief_compact.csv', index=False)
-
-          summary = {
-              'date': DATE,
-              'game_pk_expected': len(GAME_PKS),
-              'game_pk_parquet': int(df['game_pk'].nunique()),
-              'parquet_rows': int(len(df)),
-              'boxscore_pitch_sum': int(total_box_pitches),
-              'pitchers_parquet': int(len(pbp)),
-              'pitchers_boxscore': int(len(box)),
-              'rows_reconciled': int(len(recon)),
-              'exact_matches': int(recon['pitch_count_match'].fillna(False).sum()),
-              'mismatches': int((~recon['pitch_count_match'].fillna(False)).sum()),
-              'only_one_source': int((recon['_merge'] != 'both').sum()),
-              'nonstarters_compact': int(len(relief)),
-          }
-          (outdir / 'hbm26_apr10_summary.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
-          print(json.dumps(summary, indent=2))
+          relief=recon[(recon['is_starter']==False)&(recon['_merge']=='both')].copy()
+          relief['lookup_key']=relief['game_pk'].astype('int64').astype(str)+'|'+relief['pitcher_name']
+          compact=['lookup_key','game_pk','pitcher_id','pitcher_name','entry_inning','entry_half','first_play_index','last_play_index',
+                   'pbp_pitches','boxscore_np','pitch_count_match','box_bf','box_outs','box_r','box_er','box_h','box_bb','box_k','box_hr',
+                   'primary_position','pitcher_class','qa_status']
+          relief[compact].sort_values(['game_pk','pitcher_name']).to_csv(outdir/'hbm26_apr10_relief_compact.csv',index=False)
+          summary={
+              'date':DATE,'game_pk_expected':len(GAME_PKS),'game_pk_parquet':int(df['game_pk'].nunique()),
+              'parquet_rows':int(len(df)),'boxscore_pitch_sum':int(total_box_pitches),'pitchers_parquet':int(len(pbp)),
+              'pitchers_boxscore':int(len(box)),'rows_reconciled':int(len(recon)),
+              'exact_matches':int(recon['pitch_count_match'].fillna(False).sum()),
+              'mismatches':int((~recon['pitch_count_match'].fillna(False)).sum()),
+              'only_one_source':int((recon['_merge']!='both').sum()),'nonstarters_compact':int(len(relief)),
+              'bullpen_pitchers':int((relief['pitcher_class']=='BULLPEN_PITCHER').sum()),
+              'position_player_pitching':int((relief['pitcher_class']=='POSITION_PLAYER_PITCHING').sum())}
+          (outdir/'hbm26_apr10_summary.json').write_text(json.dumps(summary,indent=2),encoding='utf-8')
+          print(json.dumps(summary,indent=2))
           PY
-
       - name: Commit QA outputs
         run: |
           rm -f runtime/hbm26_2026-04-10.parquet
           git config user.name 'hbm26-qa-bot'
           git config user.email 'hbm26-qa-bot@users.noreply.github.com'
           git add runtime/hbm26_apr10_pitcher_reconciliation.csv runtime/hbm26_apr10_relief_compact.csv runtime/hbm26_apr10_summary.json
-          if git diff --cached --quiet; then
-            echo 'No changes to commit'
-          else
-            git commit -m 'HBM-26: Apr 10 pitcher-level PBP QA'
-            git push
-          fi
+          if git diff --cached --quiet; then echo 'No changes to commit'; else git commit -m 'HBM-26: Apr 10 full individual QA'; git push; fi
