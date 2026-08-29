@@ -1,0 +1,121 @@
+name: HBM26 V4 0412 Zero Pitch Correction
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-v4-0412-zero-pitch-correction.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas
+      - name: Apply audited zero-pitch nonappearance correction
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd
+
+          OUT=Path('runtime'); DATE='2026-04-12'; GP=823317; ZERO_PID=607536; STARTER_PID=623474
+          audit=json.loads((OUT/'hbm26_v4_823317_zero_pitch_audit.json').read_text(encoding='utf-8'))
+          away=audit['teams']['away']['pitchers']
+          z=next(x for x in away if int(x['pitcher_id'])==ZERO_PID)
+          s=next(x for x in away if int(x['pitcher_id'])==STARTER_PID)
+          assert int(z['numberOfPitches'])==0 and int(z['battersFaced'])==0 and z['inningsPitched']=='0.0' and int(z['gamesStarted'])==0 and int(z['gamesPitched'])==0
+          assert int(s['gamesStarted'])==1 and int(s['gamesPitched'])==1 and int(s['numberOfPitches'])>0
+
+          # Correct factual recon: listed zero-pitch/non-game entry is audit-only, not a physical pitching appearance.
+          final=pd.read_csv(OUT/'hbm26_v4_0412_all_recon.csv')
+          zero_mask=(pd.to_numeric(final['game_pk'],errors='coerce')==GP) & (pd.to_numeric(final['pitcher_id'],errors='coerce')==ZERO_PID)
+          assert int(zero_mask.sum())==1
+          zero_row=final.loc[zero_mask].copy(); zero_row['SPECIAL_CASE']='ZERO_PITCH_LISTED_NONAPPEARANCE'; zero_row['AUDIT_SOURCE']='runtime/hbm26_v4_823317_zero_pitch_audit.json'
+          zero_row.to_csv(OUT/'hbm26_v4_0412_zero_pitch_nonappearances.csv',index=False)
+          final=final.loc[~zero_mask].copy()
+          starter_mask=(pd.to_numeric(final['game_pk'],errors='coerce')==GP) & (pd.to_numeric(final['pitcher_id'],errors='coerce')==STARTER_PID)
+          assert int(starter_mask.sum())==1
+          final.loc[starter_mask,'is_starter']=True; final.loc[starter_mask,'role']='STARTER'; final.loc[starter_mask,'pitcher_class']='STARTER/OPENER/BULK'
+          final.loc[starter_mask,'qa_status']='QA_VALIDATED_CANONICAL_V4'
+          final.to_csv(OUT/'hbm26_v4_0412_all_recon.csv',index=False)
+
+          # Correct independent Savant control: physical-pitch universe excludes the audited nonappearance.
+          det=pd.read_csv(OUT/'hbm26_v4_0412_savant_pitcher_control.csv')
+          dz=(pd.to_numeric(det['game_pk'],errors='coerce')==GP) & (pd.to_numeric(det['pitcher_id'],errors='coerce')==ZERO_PID)
+          assert int(dz.sum())==1
+          rr=det.loc[dz].iloc[0]
+          assert int(rr['boxscore_np'])==0 and pd.isna(rr['savant_pitches']) and rr['_merge']=='left_only'
+          det=det.loc[~dz].copy(); det['match']=det['_merge'].eq('both') & det['boxscore_np'].eq(det['savant_pitches'])
+          det.to_csv(OUT/'hbm26_v4_0412_savant_pitcher_control.csv',index=False)
+          controls=[]
+          for gp,g in det.groupby('game_pk'):
+              controls.append({'date':DATE,'game_pk':int(gp),'savant_pitches':int(g['savant_pitches'].sum()),
+                               'boxscore_pitches':int(g['boxscore_np'].sum()),'delta':int(g['savant_pitches'].sum()-g['boxscore_np'].sum()),
+                               'pitcher_mismatches':int((~g['match']).sum()),'status':'PASS' if g['match'].all() else 'QA_REVIEW',
+                               'source':f'https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk={int(gp)}'})
+          sav=pd.DataFrame(controls).sort_values('game_pk'); sav.to_csv(OUT/'hbm26_v4_0412_savant_control.csv',index=False)
+
+          # Correct workload role/class; physical load values themselves do not change.
+          wdf=pd.read_csv(OUT/'hbm26_v4_0412_workload_all_pitchers.csv')
+          ws=(pd.to_numeric(wdf['GAME_PK'],errors='coerce')==GP) & (pd.to_numeric(wdf['MLBAM_ID'],errors='coerce')==STARTER_PID)
+          assert int(ws.sum())==1
+          wdf.loc[ws,'ROLE']='STARTER'; wdf.loc[ws,'PITCHER_CLASS']='STARTER/OPENER/BULK'; wdf.loc[ws,'QA_STATUS']='QA_VALIDATED_CANONICAL_V4'
+          wdf.to_csv(OUT/'hbm26_v4_0412_workload_all_pitchers.csv',index=False)
+          nst=wdf[wdf['ROLE']!='STARTER'].copy(); bull=nst[nst['PITCHER_CLASS']=='BULLPEN_PITCHER'].copy(); excl=nst[nst['PITCHER_CLASS']=='POSITION_PLAYER_PITCHING'].copy()
+          bull.to_csv(OUT/'hbm26_v4_0412_bullpen.csv',index=False); excl.to_csv(OUT/'hbm26_v4_0412_exclusions.csv',index=False)
+
+          unknown=bull[bull['PREV_PITCHES'].isna() & bull['PREV_ROLE'].isna() & bull['PREV_APPEARANCE_LEVEL'].isna()].copy()
+          guard_cols=['PITCHES_2D','PITCHES_3D','BF_2D','BF_3D','B2B','THREE_DAYS_3','SAME_DAY_REPEAT']
+          unknown_guard=bool(unknown[guard_cols].isna().all().all()) if len(unknown) else True
+
+          # Rebuild Sheet-ready file from corrected bullpen population.
+          fields=['RELIEVER_APPEARANCE_ID','GAME_PK','FECHA','TEAM','OPP','HOME_AWAY','MLBAM_ID','PITCHER','ROLE','DAYS_REST','PREV_PITCHES','PREV_BF','PREV_OUTS','PITCHES_2D','PITCHES_3D','BF_2D','BF_3D','B2B','THREE_DAYS_3','CURRENT_PITCHES','CURRENT_BF','CURRENT_OUTS','R','ER','H','BB','K','HR']
+          sheet=pd.DataFrame()
+          for c in fields: sheet[c]=bull[c]
+          for c in ['RA9','ER9','WHIP','BB_PCT','K_PCT','HR9','WOBA_ALLOWED']: sheet[c]=''
+          sheet['SOURCE_URL']='https://github.com/geo2343/depuracion-mlb-kernel/blob/main/runtime/hbm26_v4_sheet01_0412.csv'
+          sheet['QA_STATUS']='QA_VALIDATED_PBP_V4'; sheet['PREV_ROLE']=bull['PREV_ROLE']; sheet['PREV_APPEARANCE_LEVEL']=bull['PREV_APPEARANCE_LEVEL']; sheet['SAME_DAY_REPEAT']=bull['SAME_DAY_REPEAT']
+          order=['RELIEVER_APPEARANCE_ID','GAME_PK','FECHA','TEAM','OPP','HOME_AWAY','MLBAM_ID','PITCHER','ROLE','DAYS_REST','PREV_PITCHES','PREV_BF','PREV_OUTS','PITCHES_2D','PITCHES_3D','BF_2D','BF_3D','B2B','THREE_DAYS_3','CURRENT_PITCHES','CURRENT_BF','CURRENT_OUTS','R','ER','H','BB','K','HR','RA9','ER9','WHIP','BB_PCT','K_PCT','HR9','WOBA_ALLOWED','SOURCE_URL','QA_STATUS','PREV_ROLE','PREV_APPEARANCE_LEVEL','SAME_DAY_REPEAT']
+          sheet[order].to_csv(OUT/'hbm26_v4_sheet01_0412.csv',index=False)
+
+          # Rebuild cumulative canonical files.
+          v3bull=pd.read_csv(OUT/'hbm26_v3_bullpen.csv'); cumulative_bull=pd.concat([v3bull,bull],ignore_index=True,sort=False); cumulative_bull.to_csv(OUT/'hbm26_v4_bullpen.csv',index=False)
+          prior_full=pd.read_csv(OUT/'hbm26_v3_all_recon.csv'); cumulative_recon=pd.concat([prior_full,final],ignore_index=True,sort=False); cumulative_recon.to_csv(OUT/'hbm26_v4_all_recon.csv',index=False)
+
+          teamqa=pd.read_csv(OUT/'hbm26_v4_0412_team_qa.csv')
+          physical=final[final['_merge'].astype(str)=='both'].copy()
+          pitch_mismatches=int((~physical['pitch_count_match'].astype(bool)).sum())
+          sav_ok=(len(sav)==15 and int(sav['delta'].sum())==0 and int(sav['pitcher_mismatches'].sum())==0 and int((sav['status']!='PASS').sum())==0)
+          cum_ids=cumulative_bull['RELIEVER_APPEARANCE_ID'].astype(str)
+          summary={'date':DATE,'correction':'ZERO_PITCH_LISTED_NONAPPEARANCE + official gamesStarted starter identification',
+                   'audit_game_pk':GP,'zero_pitch_nonappearance':{'pitcher_id':ZERO_PID,'pitcher_name':z['name'],'gamesStarted':z['gamesStarted'],'gamesPitched':z['gamesPitched'],'numberOfPitches':z['numberOfPitches'],'BF':z['battersFaced'],'IP':z['inningsPitched']},
+                   'actual_starter':{'pitcher_id':STARTER_PID,'pitcher_name':s['name'],'gamesStarted':s['gamesStarted'],'numberOfPitches':s['numberOfPitches']},
+                   'games':15,'pitch_rows':int(physical['pbp_pitches'].sum()),'box_pitch_sum':int(physical['boxscore_np'].sum()),
+                   'pitch_delta':int(physical['pbp_pitches'].sum()-physical['boxscore_np'].sum()),'pitch_mismatches':pitch_mismatches,
+                   'team_line_failures':int((~teamqa['match_excluding_er'].astype(bool)).sum()),'savant_games':len(sav),
+                   'savant_pitch_total':int(sav['savant_pitches'].sum()),'savant_box_total':int(sav['boxscore_pitches'].sum()),
+                   'savant_delta':int(sav['delta'].sum()),'savant_pitcher_mismatches':int(sav['pitcher_mismatches'].sum()),
+                   'savant_games_review':int((sav['status']!='PASS').sum()),'savant_ok':bool(sav_ok),
+                   'all_physical_pitcher_appearances_0412':len(wdf),'bullpen_0412':len(bull),'position_player_exclusions_0412':len(excl),
+                   'unknown_prior_bullpen_rows':len(unknown),'unknown_prior_ids':unknown['RELIEVER_APPEARANCE_ID'].astype(str).tolist(),
+                   'unknown_zero_false_guard':bool(unknown_guard),'cumulative_bullpen_rows':len(cumulative_bull),'cumulative_duplicate_ids':int(cum_ids.duplicated().sum())}
+          status=(summary['pitch_delta']==0 and pitch_mismatches==0 and summary['team_line_failures']==0 and sav_ok and unknown_guard and summary['cumulative_duplicate_ids']==0 and len(cumulative_bull)==1460+len(bull))
+          summary['status']='PASS' if status else 'QA_REVIEW'
+          (OUT/'hbm26_v4_0412_summary.json').write_text(json.dumps(summary,indent=2,default=str),encoding='utf-8')
+          print(json.dumps(summary,indent=2,default=str))
+          if not status: raise SystemExit('Corrected V4 still fails QA')
+          PY
+      - name: Commit corrected V4
+        if: always()
+        run: |
+          git config user.name 'hbm26-qa-bot'
+          git config user.email 'hbm26-qa-bot@users.noreply.github.com'
+          git add runtime/hbm26_v4_*.csv runtime/hbm26_v4_0412_summary.json || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: correct and validate 2026-04-12 zero-pitch case'; git push; fi
