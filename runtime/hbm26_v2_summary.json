@@ -1,0 +1,102 @@
+{
+  "start": "2026-03-25",
+  "end": "2026-04-10",
+  "unique_games": 203,
+  "discovery_hits": 221,
+  "registry_duplicate_game_pk": 0,
+  "game_pk_with_multiple_final_dates": 0,
+  "duplicate_appearance_keys": 0,
+  "dates": 17,
+  "dates_pass": 17,
+  "dates_review": 0,
+  "pitch_rows": 60472,
+  "box_pitch_sum": 60472,
+  "pitch_delta": 0,
+  "pitch_mismatches": 0,
+  "fallback_games": 7,
+  "team_line_failures": 0,
+  "all_pitcher_appearances": 1767,
+  "nonstarter_appearances": 1361,
+  "bullpen_appearances": 1353,
+  "position_player_exclusions": 8,
+  "excluded_rows": [
+    {
+      "FECHA": "2026-03-30",
+      "GAME_PK": 823484,
+      "TEAM": "PHI",
+      "MLBAM_ID": 664238,
+      "PITCHER": "Dylan Moore",
+      "PRIMARY_POSITION": "CF"
+    },
+    {
+      "FECHA": "2026-03-30",
+      "GAME_PK": 822834,
+      "TEAM": "TOR",
+      "MLBAM_ID": 623168,
+      "PITCHER": "Tyler Heineman",
+      "PRIMARY_POSITION": "C"
+    },
+    {
+      "FECHA": "2026-04-02",
+      "GAME_PK": 825105,
+      "TEAM": "AZ",
+      "MLBAM_ID": 543510,
+      "PITCHER": "James McCann",
+      "PRIMARY_POSITION": "C"
+    },
+    {
+      "FECHA": "2026-04-04",
+      "GAME_PK": 823239,
+      "TEAM": "SF",
+      "MLBAM_ID": 683766,
+      "PITCHER": "Christian Koss",
+      "PRIMARY_POSITION": "3B"
+    },
+    {
+      "FECHA": "2026-04-06",
+      "GAME_PK": 822832,
+      "TEAM": "LAD",
+      "MLBAM_ID": 500743,
+      "PITCHER": "Miguel Rojas",
+      "PRIMARY_POSITION": "2B"
+    },
+    {
+      "FECHA": "2026-04-06",
+      "GAME_PK": 822832,
+      "TEAM": "TOR",
+      "MLBAM_ID": 623168,
+      "PITCHER": "Tyler Heineman",
+      "PRIMARY_POSITION": "C"
+    },
+    {
+      "FECHA": "2026-04-08",
+      "GAME_PK": 824455,
+      "TEAM": "KC",
+      "MLBAM_ID": 686475,
+      "PITCHER": "Tyler Tolbert",
+      "PRIMARY_POSITION": "SS"
+    },
+    {
+      "FECHA": "2026-04-10",
+      "GAME_PK": 824534,
+      "TEAM": "CIN",
+      "MLBAM_ID": 664731,
+      "PITCHER": "P.J. Higgins",
+      "PRIMARY_POSITION": "C"
+    }
+  ],
+  "extra_loads": [
+    {
+      "pitcher_id": 592094,
+      "pitcher_name": "Jason Adam",
+      "date": "2026-04-05",
+      "game_pk": 814796,
+      "pitches": 17,
+      "bf": null,
+      "outs": null,
+      "role": "REHAB_RELIEF",
+      "level": "MILB_REHAB",
+      "source": "https://baseballsavant.mlb.com/player-scroll/game?gamePk=814796&player_id=592094"
+    }
+  ]
+}
