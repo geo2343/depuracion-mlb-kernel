@@ -1,0 +1,47 @@
+{
+  "date": "2026-04-11",
+  "rule": "UNKNOWN != 0/FALSE when prior competitive history is not established",
+  "sheet_rows_normalized": 2,
+  "sheet_ids": [
+    "823644-518886",
+    "823074-694363"
+  ],
+  "files": {
+    "hbm26_v3_sheet01_0411.csv": {
+      "rows_normalized": 2,
+      "ids": [
+        "823644-518886",
+        "823074-694363"
+      ]
+    },
+    "hbm26_v3_0411_bullpen.csv": {
+      "rows_normalized": 2,
+      "ids": [
+        "823644-518886",
+        "823074-694363"
+      ]
+    },
+    "hbm26_v3_bullpen.csv": {
+      "rows_normalized": 2,
+      "ids": [
+        "823644-518886",
+        "823074-694363"
+      ]
+    },
+    "hbm26_v3_nonstarters.csv": {
+      "rows_normalized": 2,
+      "ids": [
+        "823644-518886",
+        "823074-694363"
+      ]
+    },
+    "hbm26_v3_workload_all_pitchers.csv": {
+      "rows_normalized": 2,
+      "ids": [
+        "823644-518886",
+        "823074-694363"
+      ]
+    }
+  },
+  "status": "PASS"
+}
