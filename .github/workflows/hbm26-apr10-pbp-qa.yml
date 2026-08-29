@@ -53,10 +53,9 @@ jobs:
                         entry_inning=('inning','min'),
                         first_play_index=('at_bat_number','min'),
                         last_play_index=('at_bat_number','max'),
-                        first_pitch_row=(' _row_in_game'.strip(),'min'),
-                        last_pitch_row=(' _row_in_game'.strip(),'max')))
+                        first_pitch_row=('_row_in_game','min'),
+                        last_pitch_row=('_row_in_game','max')))
 
-          # Entry half must come from the first physical pitch row, not lexicographic min.
           first_rows = (df.sort_values(['game_pk','_row_in_game'])
                           .drop_duplicates(['game_pk','pitcher_id'])
                           [['game_pk','pitcher_id','top_bottom']]
@@ -102,6 +101,13 @@ jobs:
           recon[order].sort_values(['game_pk','team_side','is_starter','pitcher_id']).to_csv(
               outdir / 'hbm26_apr10_pitcher_reconciliation.csv', index=False)
 
+          relief = recon[(recon['is_starter'] == False) & (recon['_merge'] == 'both')].copy()
+          relief['lookup_key'] = relief['game_pk'].astype('int64').astype(str) + '|' + relief['pitcher_name']
+          compact = ['lookup_key','game_pk','pitcher_id','pitcher_name','entry_inning','entry_half',
+                     'first_play_index','last_play_index','pbp_pitches','boxscore_np','pitch_count_match','qa_status']
+          relief[compact].sort_values(['game_pk','pitcher_name']).to_csv(
+              outdir / 'hbm26_apr10_relief_compact.csv', index=False)
+
           summary = {
               'date': DATE,
               'game_pk_expected': len(GAME_PKS),
@@ -114,6 +120,7 @@ jobs:
               'exact_matches': int(recon['pitch_count_match'].fillna(False).sum()),
               'mismatches': int((~recon['pitch_count_match'].fillna(False)).sum()),
               'only_one_source': int((recon['_merge'] != 'both').sum()),
+              'nonstarters_compact': int(len(relief)),
           }
           (outdir / 'hbm26_apr10_summary.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
           print(json.dumps(summary, indent=2))
@@ -124,7 +131,7 @@ jobs:
           rm -f runtime/hbm26_2026-04-10.parquet
           git config user.name 'hbm26-qa-bot'
           git config user.email 'hbm26-qa-bot@users.noreply.github.com'
-          git add runtime/hbm26_apr10_pitcher_reconciliation.csv runtime/hbm26_apr10_summary.json
+          git add runtime/hbm26_apr10_pitcher_reconciliation.csv runtime/hbm26_apr10_relief_compact.csv runtime/hbm26_apr10_summary.json
           if git diff --cached --quiet; then
             echo 'No changes to commit'
           else
