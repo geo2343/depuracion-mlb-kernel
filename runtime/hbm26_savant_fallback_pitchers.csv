@@ -1,0 +1,60 @@
+pitcher,savant_pitches,savant_name,entry_inning,first_at_bat,last_at_bat,box_name,box_np,team_side,_merge,game_pk,delta,match
+592836,99,"García Jr., Luis",1,1,43,Taijuan Walker,99,home,both,823484,0,True
+621237,29,"García Jr., Luis",9,77,82,José Alvarado,29,home,both,823484,0,True
+641835,23,"Abrams, CJ",7,62,72,Tim Mayza,23,home,both,823484,0,True
+656492,86,"Harper, Bryce",1,11,51,Foster Griffin,86,away,both,823484,0,True
+664238,8,"Abrams, CJ",9,83,85,Dylan Moore,8,home,both,823484,0,True
+669371,18,"Harper, Bryce",9,86,90,Cole Henry,18,away,both,823484,0,True
+680742,26,"Wiemer, Joey",5,44,57,Jonathan Bowlan,26,home,both,823484,0,True
+695418,51,"Kemp, Otto",6,58,76,Brad Lord,51,away,both,823484,0,True
+607067,42,"Moncada, Yoán",7,51,71,Colin Rea,42,home,both,824702,0,True
+641312,40,"Happ, Ian",6,48,66,Shaun Anderson,40,away,both,824702,0,True
+664192,30,"Busch, Michael",4,35,44,Joey Lucchesi,29,away,both,824702,1,False
+665795,80,"Neto, Zach",1,1,47,Edward Cabrera,80,home,both,824702,0,True
+696270,80,"Crow-Armstrong, Pete",1,4,35,Ryan Johnson,80,away,both,824702,0,True
+455119,19,"Henderson, Gunnar",9,76,81,Chris Martin,19,away,both,824861,0,True
+594798,79,"Henderson, Gunnar",1,4,44,Jacob deGrom,79,away,both,824861,0,True
+596001,15,"Henderson, Gunnar",7,61,64,Jakob Junis,15,away,both,824861,0,True
+621107,74,"Duran, Ezequiel",1,1,29,Zach Eflin,74,home,both,824861,0,True
+664991,23,"Smith, Josh",4,29,39,Grant Wolfram,23,home,both,824861,0,True
+666974,9,"Langford, Wyatt",6,46,50,Yennier Cano,9,home,both,824861,0,True
+668390,14,"Cowser, Colton",5,45,54,Cole Winn,14,away,both,824861,0,True
+676395,15,"Basallo, Samuel",8,68,70,Robert Garcia,15,away,both,824861,0,True
+682274,24,"Carter, Evan",7,55,60,Yaramil Hiraldo,24,home,both,824861,0,True
+689296,21,"Jansen, Danny",8,65,75,Anthony Nunez,21,home,both,824861,0,True
+542888,13,"Bregman, Alex",8,58,60,Shawn Armstrong,13,home,both,824458,0,True
+571948,10,"Martínez, Angel",5,37,47,Hoby Milner,10,away,both,824458,0,True
+607067,57,"Rocchio, Brayan",2,11,36,Colin Rea,57,away,both,824458,0,True
+640451,30,"DeLauter, Chase",7,51,55,Hunter Harvey,30,away,both,824458,0,True
+641401,13,"Crow-Armstrong, Pete",7,48,50,Connor Brogdon,13,home,both,824458,0,True
+657097,29,"Schneemann, Daniel",7,56,63,Jacob Webb,29,away,both,824458,0,True
+670036,4,"Busch, Michael",6,42,43,Matt Festa,4,home,both,824458,0,True
+671922,22,"Swanson, Dansby",9,64,67,Cade Smith,22,home,both,824458,0,True
+676282,82,"Happ, Ian",1,1,41,Joey Cantillo,82,home,both,824458,0,True
+690990,17,"Naylor, Bo",1,4,11,Cade Horton,17,away,both,824458,0,True
+608718,39,"Arozarena, Randy",5,46,64,Brent Suter,39,home,both,824053,0,True
+622491,84,"Trout, Mike",1,5,40,Luis Castillo,84,away,both,824053,0,True
+641312,27,"Raleigh, Cal",10,83,93,Shaun Anderson,27,home,both,824053,0,True
+642100,7,"Schanuel, Nolan",11,94,96,Gabe Speier,3,away,both,824053,4,False
+662253,16,"Adell, Jo",9,80,82,Andrés Muñoz,16,away,both,824053,0,True
+666171,27,"Crawford, J.P.",3,27,46,Ryan Zeferjahn,27,home,both,824053,0,True
+666374,10,"Frazier, Adam",10,86,88,Matt Brash,10,away,both,824053,0,True
+668984,26,"Schanuel, Nolan",7,65,74,Casey Legumina,26,away,both,824053,0,True
+677961,23,"Candelario, Jeimer",5,54,61,Cole Wilcox,23,away,both,824053,0,True
+678606,19,"Frazier, Adam",4,41,53,José A. Ferrer,19,away,both,824053,0,True
+691946,73,"Young, Cole",1,1,26,George Klassen,73,home,both,824053,0,True
+696147,28,"Naylor, Josh",8,68,79,Sam Bachman,28,home,both,824053,0,True
+579328,97,"Olson, Matt",1,1,40,Yusei Kikuchi,97,home,both,824051,0,True
+607481,17,"Adell, Jo",8,66,68,Aaron Bummer,17,away,both,824051,0,True
+625643,80,"Soler, Jorge",1,4,44,Reynaldo López,80,away,both,824051,0,True
+628452,22,"Schanuel, Nolan",8,69,80,Raisel Iglesias,22,away,both,824051,0,True
+641312,62,"Acuña Jr., Ronald",6,45,72,Shaun Anderson,62,home,both,824051,0,True
+641755,13,"Adell, Jo",5,44,50,Tyler Kinley,13,away,both,824051,0,True
+663158,26,"Schanuel, Nolan",7,56,59,Robert Suarez,26,away,both,824051,0,True
+669276,9,"d'Arnaud, Travis",6,51,52,Dylan Lee,9,away,both,824051,0,True
+815083,14,"Riley, Austin",9,73,76,Mitch Farris,14,home,both,824051,0,True
+605488,93,"Wells, Austin",1,5,52,Jeffrey Springs,93,away,both,823565,0,True
+621112,19,"Wynns, Austin",9,60,63,Paul Blackburn,19,home,both,823565,0,True
+663687,14,"Rice, Ben",9,64,66,Hogan Harris,14,away,both,823565,0,True
+677960,101,"Butler, Lawrence",1,1,55,Ryan Weathers,101,home,both,823565,0,True
+686993,21,"Judge, Aaron",8,56,59,Justin Sterner,21,away,both,823565,0,True
