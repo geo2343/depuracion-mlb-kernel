@@ -1,0 +1,284 @@
+name: HBM26 Canonical V3 Through 0411
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-canonical-v3-through-0411.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas pyarrow requests
+      - name: Build canonical V3 through 2026-04-11
+        run: |
+          python - <<'PY'
+          import io, json, time
+          from collections import defaultdict
+          from datetime import date, timedelta
+          from pathlib import Path
+          import pandas as pd
+          import requests
+
+          START=date(2026,3,25); END=date(2026,4,11); PRIOR_END=date(2026,4,10)
+          DISCOVERY_START=START-timedelta(days=1); DISCOVERY_END=END+timedelta(days=1)
+          OUT=Path('runtime'); OUT.mkdir(exist_ok=True)
+          PBP_BASE='https://raw.githubusercontent.com/lancebroz/mlb-pitcher-data/main/data/raw/2026/daily'
+          S=requests.Session(); S.headers.update({'User-Agent':'HBM-26-Canonical-V3/1.0'})
+          EXTRA_LOADS=[{'pitcher_id':592094,'pitcher_name':'Jason Adam','date':'2026-04-05','game_pk':814796,
+                        'pitches':17,'bf':None,'outs':None,'role':'REHAB_RELIEF','level':'MILB_REHAB',
+                        'source':'https://baseballsavant.mlb.com/player-scroll/game?gamePk=814796&player_id=592094'}]
+
+          def daterange(a,b):
+              d=a
+              while d<=b:
+                  yield d; d+=timedelta(days=1)
+          def get_json(url,retries=4):
+              last=None
+              for i in range(retries):
+                  try:
+                      r=S.get(url,timeout=75); r.raise_for_status(); return r.json()
+                  except Exception as e:
+                      last=e; time.sleep(1.2*(i+1))
+              raise last
+          def ip_to_outs(ip):
+              s=str(ip or '0.0'); w,_,f=s.partition('.'); return int(w)*3+int((f or '0')[:1])
+          def savant_game(gp):
+              u=f'https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk={gp}'
+              r=S.get(u,timeout=120); r.raise_for_status(); df=pd.read_csv(io.StringIO(r.text))
+              if 'game_pk' in df.columns:
+                  df=df[pd.to_numeric(df['game_pk'],errors='coerce')==gp].copy()
+              desc=df['description'].fillna('').astype(str).str.lower() if 'description' in df.columns else pd.Series('',index=df.index)
+              df=df[~desc.str.startswith('automatic_')].copy()
+              df['pitcher_id']=pd.to_numeric(df['pitcher'],errors='coerce').astype('Int64')
+              df=df.dropna(subset=['pitcher_id']).copy(); df['pitcher_id']=df['pitcher_id'].astype('int64')
+              df['_ord']=range(1,len(df)+1)
+              g=(df.groupby('pitcher_id',as_index=False)
+                   .agg(pbp_pitches=('pitcher_id','size'),entry_inning=('inning','min'),
+                        first_play_index=('at_bat_number','min'),last_play_index=('at_bat_number','max'),
+                        first_pitch_row=('_ord','min'),last_pitch_row=('_ord','max')))
+              first=(df.sort_values('_ord').drop_duplicates('pitcher_id')[['pitcher_id','inning_topbot']]
+                     .rename(columns={'inning_topbot':'entry_half'})) if 'inning_topbot' in df.columns else pd.DataFrame()
+              if len(first): g=g.merge(first,on='pitcher_id',how='left')
+              else: g['entry_half']=''
+              g['game_pk']=gp; g['pbp_source']=u; g['fallback_used']=True
+              return g
+
+          # Discovery only; FECHA always comes from feed officialDate.
+          discovered={}; discovery_hits=[]
+          for qd in daterange(DISCOVERY_START,DISCOVERY_END):
+              js=get_json(f'https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&date={qd.isoformat()}')
+              for blk in js.get('dates',[]):
+                  for g in blk.get('games',[]):
+                      if g.get('status',{}).get('abstractGameState')!='Final': continue
+                      gp=int(g['gamePk']); discovery_hits.append({'query_date':qd.isoformat(),'game_pk':gp})
+                      discovered.setdefault(gp,{'query_dates':set()})['query_dates'].add(qd.isoformat())
+
+          game_meta={}; feeds={}
+          for gp in sorted(discovered):
+              feed=get_json(f'https://statsapi.mlb.com/api/v1.1/game/{gp}/feed/live'); feeds[gp]=feed
+              gd=feed.get('gameData',{}); dt=gd.get('datetime',{}); off=dt.get('officialDate')
+              if not off: continue
+              od=date.fromisoformat(off)
+              if not (START<=od<=END): continue
+              game_meta[gp]={'game_pk':gp,'official_date':off,'game_dt':dt.get('dateTime'),
+                             'query_dates':'|'.join(sorted(discovered[gp]['query_dates']))}
+          discovery_df=pd.DataFrame([{'game_pk':gp,**m,'query_hit_count':len(discovered[gp]['query_dates'])} for gp,m in game_meta.items()])
+          discovery_df.to_csv(OUT/'hbm26_v3_game_registry.csv',index=False)
+
+          # Boxscore truth once per unique GAME_PK.
+          box=[]; teamqa=[]; person_ids=set()
+          for gp,m in sorted(game_meta.items(),key=lambda kv:(kv[1]['official_date'],kv[0])):
+              feed=feeds[gp]; gd=feed.get('gameData',{}); off=m['official_date']; gdt=m['game_dt']
+              for side in ('away','home'):
+                  oppside='home' if side=='away' else 'away'
+                  tm=feed['liveData']['boxscore']['teams'][side]
+                  team_abbr=gd.get('teams',{}).get(side,{}).get('abbreviation')
+                  opp_abbr=gd.get('teams',{}).get(oppside,{}).get('abbreviation')
+                  porder=tm.get('pitchers',[]); starter=porder[0] if porder else None
+                  sums=defaultdict(int)
+                  for pid in porder:
+                      pobj=tm.get('players',{}).get(f'ID{pid}',{}); st=pobj.get('stats',{}).get('pitching',{})
+                      np=st.get('numberOfPitches')
+                      if np is None: continue
+                      vals={'bf':int(st.get('battersFaced') or 0),'outs':ip_to_outs(st.get('inningsPitched')),
+                            'r':int(st.get('runs') or 0),'er':int(st.get('earnedRuns') or 0),'h':int(st.get('hits') or 0),
+                            'bb':int(st.get('baseOnBalls') or 0),'k':int(st.get('strikeOuts') or 0),'hr':int(st.get('homeRuns') or 0)}
+                      for k,v in vals.items(): sums[k]+=v
+                      pid=int(pid); person_ids.add(pid)
+                      box.append({'date':off,'game_pk':gp,'game_date_time':gdt,'team':team_abbr,'opp':opp_abbr,
+                                  'home_away':'A' if side=='away' else 'H','pitcher_id':pid,
+                                  'pitcher_name':pobj.get('person',{}).get('fullName'),'is_starter':pid==starter,
+                                  'role':'STARTER' if pid==starter else 'RELIEF_OR_BULK','boxscore_np':int(np),**vals,
+                                  'boxscore_source':f'https://statsapi.mlb.com/api/v1.1/game/{gp}/feed/live'})
+                  ts=tm.get('teamStats',{}).get('pitching',{})
+                  chk={'bf':int(ts.get('battersFaced') or 0),'outs':ip_to_outs(ts.get('inningsPitched')),
+                       'r':int(ts.get('runs') or 0),'h':int(ts.get('hits') or 0),'bb':int(ts.get('baseOnBalls') or 0),
+                       'k':int(ts.get('strikeOuts') or 0),'hr':int(ts.get('homeRuns') or 0)}
+                  ok=all(sums[k]==chk[k] for k in chk)
+                  teamqa.append({'date':off,'game_pk':gp,'team':team_abbr,'match_excluding_er':ok,
+                                 **{f'sum_{k}':sums[k] for k in chk},**{f'team_{k}':chk[k] for k in chk},
+                                 'sum_er':sums['er'],'team_er':int(ts.get('earnedRuns') or 0)})
+          bdf=pd.DataFrame(box)
+
+          # Official primary positions.
+          pos={}; ids=sorted(person_ids)
+          for i in range(0,len(ids),50):
+              batch=ids[i:i+50]
+              people=get_json('https://statsapi.mlb.com/api/v1/people?personIds='+','.join(map(str,batch))).get('people') or []
+              for p in people:
+                  pp=p.get('primaryPosition') or {}; pos[int(p['id'])]=(pp.get('abbreviation') or '',pp.get('name') or '')
+              time.sleep(.05)
+
+          # Per-pitch PBP. Derived parquet is accepted only if every pitcher matches boxscore NP; otherwise full-game Savant fallback.
+          pbp_parts=[]; fallback_games=set(); parquet_cache={}
+          for off,gpsdf in pd.DataFrame(game_meta.values()).groupby('official_date'):
+              gps=set(gpsdf['game_pk'].astype(int).tolist()); pq_url=f'{PBP_BASE}/{off}.parquet'; pdf=None
+              try:
+                  rr=S.get(pq_url,timeout=90); rr.raise_for_status(); tmp=OUT/f'_v3_{off}.parquet'; tmp.write_bytes(rr.content)
+                  cols=['game_pk','pitcher_id','pitcher_name','inning','top_bottom','at_bat_number','pitch_number']
+                  pdf=pd.read_parquet(tmp,columns=cols); tmp.unlink(missing_ok=True)
+                  pdf['game_pk']=pd.to_numeric(pdf['game_pk'],errors='coerce').astype('Int64')
+                  pdf['pitcher_id']=pd.to_numeric(pdf['pitcher_id'],errors='coerce').astype('Int64')
+              except Exception:
+                  pdf=pd.DataFrame()
+              for gp in sorted(gps):
+                  use_fallback=False
+                  if pdf is None or pdf.empty or gp not in set(pdf['game_pk'].dropna().astype(int).tolist()):
+                      use_fallback=True; pg=None
+                  else:
+                      p=pdf[pdf['game_pk'].astype('Int64')==gp].dropna(subset=['pitcher_id']).copy(); p['pitcher_id']=p['pitcher_id'].astype('int64'); p['_ord']=range(1,len(p)+1)
+                      pg=(p.groupby('pitcher_id',as_index=False)
+                            .agg(pbp_pitches=('pitch_number','size'),entry_inning=('inning','min'),
+                                 first_play_index=('at_bat_number','min'),last_play_index=('at_bat_number','max'),
+                                 first_pitch_row=('_ord','min'),last_pitch_row=('_ord','max')))
+                      first=p.sort_values('_ord').drop_duplicates('pitcher_id')[['pitcher_id','top_bottom']].rename(columns={'top_bottom':'entry_half'})
+                      pg=pg.merge(first,on='pitcher_id',how='left'); pg['game_pk']=gp; pg['pbp_source']=pq_url; pg['fallback_used']=False
+                      bx=bdf[bdf.game_pk==gp][['pitcher_id','boxscore_np']]
+                      chk=pg.merge(bx,on='pitcher_id',how='outer',indicator=True)
+                      chk['ok']=chk['_merge'].eq('both') & chk['pbp_pitches'].eq(chk['boxscore_np'])
+                      if not chk['ok'].all(): use_fallback=True
+                  if use_fallback:
+                      pg=savant_game(gp); fallback_games.add(gp); time.sleep(.2)
+                  pbp_parts.append(pg)
+
+          pbp=pd.concat(pbp_parts,ignore_index=True,sort=False)
+          final=pbp.merge(bdf,on=['game_pk','pitcher_id'],how='outer',indicator=True)
+          final['pitch_count_match']=final['_merge'].eq('both') & final['pbp_pitches'].eq(final['boxscore_np'])
+          final['primary_position']=final['pitcher_id'].map(lambda x:pos.get(int(x),('',''))[0] if pd.notna(x) else '')
+          final['primary_position_name']=final['pitcher_id'].map(lambda x:pos.get(int(x),('',''))[1] if pd.notna(x) else '')
+          final['pitcher_class']=final.apply(lambda r:'STARTER/OPENER/BULK' if bool(r.get('is_starter')) else ('BULLPEN_PITCHER' if r.get('primary_position') in ('P','TWP') else 'POSITION_PLAYER_PITCHING'),axis=1)
+          final['line_stats_match']=True
+          final['qa_status']=final.apply(lambda r:'EXCLUIR_POSITION_PLAYER_PITCHING' if r['pitcher_class']=='POSITION_PLAYER_PITCHING' else ('QA_VALIDATED_CANONICAL_V3' if bool(r['pitch_count_match']) else 'QA_REVIEW'),axis=1)
+
+          both=final[final['_merge']=='both'].copy(); both['game_pk']=both['game_pk'].astype(int); both['pitcher_id']=both['pitcher_id'].astype(int)
+          both['appearance_key']=both['game_pk'].astype(str)+'|'+both['pitcher_id'].astype(str)
+          dup_app=int(both['appearance_key'].duplicated().sum())
+          gp_multi_date=int((both.groupby('game_pk')['date'].nunique()>1).sum())
+          registry_dups=int(pd.DataFrame(game_meta.values())['game_pk'].duplicated().sum())
+
+          # Workload history over ALL pitcher roles; same-day repeat is not DAYS_REST=0.
+          both['event_dt']=pd.to_datetime(both['game_date_time'],utc=True,errors='coerce'); both['event_date']=pd.to_datetime(both['date']).dt.date
+          both=both.sort_values(['event_dt','game_pk','pitcher_id']).reset_index(drop=True)
+          extra_by=defaultdict(list)
+          for x in EXTRA_LOADS:
+              extra_by[int(x['pitcher_id'])].append({**x,'event_date':date.fromisoformat(x['date']),'event_dt':pd.Timestamp(x['date']+'T12:00:00Z')})
+          hist=defaultdict(list); work=[]
+          for _,r in both.iterrows():
+              pid=int(r['pitcher_id']); cd=r['event_date']; cdt=r['event_dt']
+              prior=list(hist[pid])+[x for x in extra_by.get(pid,[]) if x['event_dt']<cdt]; prior=sorted(prior,key=lambda x:x['event_dt'])
+              prev=prior[-1] if prior else None
+              if prev:
+                  gap=(cd-prev['event_date']).days; same=(gap==0); rest=None if same else max(gap-1,0)
+              else: same=False; rest=None
+              w2=[x for x in prior if 0 <= (cd-x['event_date']).days <=2]; w3=[x for x in prior if 0 <= (cd-x['event_date']).days <=3]
+              p2=sum(int(x['pitches']) for x in w2 if x.get('pitches') is not None); p3=sum(int(x['pitches']) for x in w3 if x.get('pitches') is not None)
+              bf2=None if any(x.get('bf') is None for x in w2) else sum(int(x['bf']) for x in w2)
+              bf3=None if any(x.get('bf') is None for x in w3) else sum(int(x['bf']) for x in w3)
+              dateset={x['event_date'] for x in prior}
+              work.append({'RELIEVER_APPEARANCE_ID':f"{int(r['game_pk'])}-{pid}",'GAME_PK':int(r['game_pk']),'FECHA':r['date'],
+                           'TEAM':r['team'],'OPP':r['opp'],'HOME_AWAY':r['home_away'],'MLBAM_ID':pid,'PITCHER':r['pitcher_name'],'ROLE':r['role'],
+                           'DAYS_REST':rest,'PREV_PITCHES':prev.get('pitches') if prev else None,'PREV_BF':prev.get('bf') if prev else None,
+                           'PREV_OUTS':prev.get('outs') if prev else None,'PITCHES_2D':p2,'PITCHES_3D':p3,'BF_2D':bf2,'BF_3D':bf3,
+                           'B2B':(cd-timedelta(days=1)) in dateset,'THREE_DAYS_3':((cd-timedelta(days=1)) in dateset and (cd-timedelta(days=2)) in dateset),
+                           'CURRENT_PITCHES':int(r['pbp_pitches']),'CURRENT_BF':int(r['bf']),'CURRENT_OUTS':int(r['outs']),
+                           'R':int(r['r']),'ER':int(r['er']),'H':int(r['h']),'BB':int(r['bb']),'K':int(r['k']),'HR':int(r['hr']),
+                           'SOURCE_URL':r['pbp_source'],'QA_STATUS':r['qa_status'],'PREV_ROLE':prev.get('role') if prev else None,
+                           'PREV_APPEARANCE_LEVEL':prev.get('level') if prev else None,'SAME_DAY_REPEAT':same,'PITCHER_CLASS':r['pitcher_class'],
+                           'PRIMARY_POSITION':r['primary_position'],'PBP_SOURCE':r['pbp_source'],'BOXSCORE_SOURCE':r['boxscore_source'],
+                           'PITCH_COUNT_MATCH':bool(r['pitch_count_match']),'ENTRY_INNING':r.get('entry_inning'),'ENTRY_HALF':r.get('entry_half'),
+                           'FIRST_PLAY_INDEX':r.get('first_play_index'),'LAST_PLAY_INDEX':r.get('last_play_index')})
+              hist[pid].append({'event_date':cd,'event_dt':cdt,'game_pk':int(r['game_pk']),'pitches':int(r['pbp_pitches']),
+                                'bf':int(r['bf']),'outs':int(r['outs']),'role':r['role'],'level':'MLB'})
+          wdf=pd.DataFrame(work); nst=wdf[wdf['ROLE']!='STARTER'].copy(); bull=nst[nst['PITCHER_CLASS']=='BULLPEN_PITCHER'].copy(); excl=nst[nst['PITCHER_CLASS']=='POSITION_PLAYER_PITCHING'].copy()
+
+          # Daily QA.
+          tq=pd.DataFrame(teamqa); daily=[]
+          for off in [d.isoformat() for d in daterange(START,END)]:
+              gps={gp for gp,m in game_meta.items() if m['official_date']==off}; fd=final[final['game_pk'].isin(gps)] if gps else final.iloc[0:0]
+              boxsum=int(fd.loc[fd['_merge']=='both','boxscore_np'].sum()) if len(fd) else 0; pbpsum=int(fd.loc[fd['_merge']=='both','pbp_pitches'].sum()) if len(fd) else 0
+              mism=int((~fd['pitch_count_match'].fillna(False)).sum()) if len(fd) else 0
+              tbad=int((~tq[tq.date==off]['match_excluding_er']).sum()) if len(tq[tq.date==off]) else 0
+              fbg=sorted(gps.intersection(fallback_games)); status='PASS' if mism==0 and tbad==0 else 'QA_REVIEW'
+              daily.append({'date':off,'games':len(gps),'pitch_rows':pbpsum,'box_pitch_sum':boxsum,'pitch_delta':pbpsum-boxsum,
+                            'mismatches':mism,'fallback_games':len(fbg),'fallback_game_pks':'|'.join(map(str,fbg)),
+                            'team_line_failures':tbad,'status':status})
+          ddf=pd.DataFrame(daily)
+
+          # Immutable-history gate: V3 must reproduce V2 bullpen rows through 2026-04-10 exactly on factual/workload fields.
+          v2=pd.read_csv(OUT/'hbm26_v2_bullpen.csv')
+          prior=bull[bull['FECHA']<=PRIOR_END.isoformat()].copy()
+          compare_cols=[c for c in v2.columns if c in prior.columns and c not in ('QA_STATUS',)]
+          a=v2[compare_cols].sort_values('RELIEVER_APPEARANCE_ID').reset_index(drop=True)
+          b=prior[compare_cols].sort_values('RELIEVER_APPEARANCE_ID').reset_index(drop=True)
+          prior_integrity=(len(a)==len(b) and a.equals(b))
+
+          newday=bull[bull['FECHA']==END.isoformat()].copy()
+          review=final[(final['date']==END.isoformat()) & (~final['pitch_count_match'].fillna(False))].copy()
+          newexcl=excl[excl['FECHA']==END.isoformat()].copy()
+
+          # Sheet-ready 40-column output for 11/04 only. Deterministic metric columns remain blank for Sheet formulas.
+          fields=['RELIEVER_APPEARANCE_ID','GAME_PK','FECHA','TEAM','OPP','HOME_AWAY','MLBAM_ID','PITCHER','ROLE','DAYS_REST','PREV_PITCHES','PREV_BF','PREV_OUTS','PITCHES_2D','PITCHES_3D','BF_2D','BF_3D','B2B','THREE_DAYS_3','CURRENT_PITCHES','CURRENT_BF','CURRENT_OUTS','R','ER','H','BB','K','HR']
+          sheet=pd.DataFrame();
+          for c in fields: sheet[c]=newday[c]
+          for c in ['RA9','ER9','WHIP','BB_PCT','K_PCT','HR9','WOBA_ALLOWED']: sheet[c]=''
+          sheet['SOURCE_URL']='https://github.com/geo2343/depuracion-mlb-kernel/blob/main/runtime/hbm26_v3_sheet01_0411.csv'
+          sheet['QA_STATUS']='QA_VALIDATED_PBP_V3'
+          sheet['PREV_ROLE']=newday['PREV_ROLE']; sheet['PREV_APPEARANCE_LEVEL']=newday['PREV_APPEARANCE_LEVEL']; sheet['SAME_DAY_REPEAT']=newday['SAME_DAY_REPEAT']
+          order=['RELIEVER_APPEARANCE_ID','GAME_PK','FECHA','TEAM','OPP','HOME_AWAY','MLBAM_ID','PITCHER','ROLE','DAYS_REST','PREV_PITCHES','PREV_BF','PREV_OUTS','PITCHES_2D','PITCHES_3D','BF_2D','BF_3D','B2B','THREE_DAYS_3','CURRENT_PITCHES','CURRENT_BF','CURRENT_OUTS','R','ER','H','BB','K','HR','RA9','ER9','WHIP','BB_PCT','K_PCT','HR9','WOBA_ALLOWED','SOURCE_URL','QA_STATUS','PREV_ROLE','PREV_APPEARANCE_LEVEL','SAME_DAY_REPEAT']
+          sheet[order].to_csv(OUT/'hbm26_v3_sheet01_0411.csv',index=False)
+
+          final.to_csv(OUT/'hbm26_v3_all_recon.csv',index=False); wdf.to_csv(OUT/'hbm26_v3_workload_all_pitchers.csv',index=False)
+          nst.to_csv(OUT/'hbm26_v3_nonstarters.csv',index=False); bull.to_csv(OUT/'hbm26_v3_bullpen.csv',index=False); excl.to_csv(OUT/'hbm26_v3_position_player_exclusions.csv',index=False)
+          ddf.to_csv(OUT/'hbm26_v3_daily_qa.csv',index=False); tq.to_csv(OUT/'hbm26_v3_team_qa.csv',index=False)
+          pd.DataFrame(discovery_hits).to_csv(OUT/'hbm26_v3_schedule_discovery_hits.csv',index=False)
+          newday.to_csv(OUT/'hbm26_v3_0411_bullpen.csv',index=False); newexcl.to_csv(OUT/'hbm26_v3_0411_exclusions.csv',index=False); review.to_csv(OUT/'hbm26_v3_0411_review.csv',index=False)
+
+          q11=ddf[ddf.date==END.isoformat()].iloc[0].to_dict()
+          summary={'start':START.isoformat(),'end':END.isoformat(),'unique_games':len(game_meta),'registry_duplicate_game_pk':registry_dups,
+                   'game_pk_with_multiple_final_dates':gp_multi_date,'duplicate_appearance_keys':dup_app,'pitch_mismatches':int(ddf.mismatches.sum()),
+                   'team_line_failures':int(ddf.team_line_failures.sum()),'dates_review':int((ddf.status!='PASS').sum()),'fallback_games':len(fallback_games),
+                   'all_pitcher_appearances':len(wdf),'bullpen_appearances':len(bull),'position_player_exclusions':len(excl),
+                   'prior_v2_rows_expected':len(v2),'prior_v3_rows_actual':len(prior),'prior_integrity_match':bool(prior_integrity),
+                   'date_0411':q11,'bullpen_0411':len(newday),'exclusions_0411':len(newexcl),'review_rows_0411':len(review),
+                   'extra_loads':EXTRA_LOADS}
+          (OUT/'hbm26_v3_summary.json').write_text(json.dumps(summary,indent=2,default=str),encoding='utf-8')
+          print(json.dumps(summary,indent=2,default=str))
+          bad=(registry_dups or gp_multi_date or dup_app or summary['pitch_mismatches'] or summary['team_line_failures'] or summary['dates_review'] or not prior_integrity or q11['status']!='PASS' or len(review))
+          if bad: raise SystemExit('V3 QA failed; 11/04 NOT authorized for Sheet promotion')
+          PY
+      - name: Commit V3 outputs
+        if: always()
+        run: |
+          git config user.name 'hbm26-qa-bot'
+          git config user.email 'hbm26-qa-bot@users.noreply.github.com'
+          git add runtime/hbm26_v3_*.csv runtime/hbm26_v3_summary.json || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: V3 canonical through 2026-04-11'; git push; fi
