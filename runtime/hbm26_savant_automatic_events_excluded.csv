@@ -1,0 +1,6 @@
+game_pk,pitcher,player_name,inning,inning_topbot,at_bat_number,pitch_number,pitch_type,release_speed,description,type,events,des,sv_id
+824702,664192,"Swanson, Dansby",5,Bot,42,7,,,automatic_ball,B,walk,Dansby Swanson walks.,
+824053,642100,"Neto, Zach",11,Bot,94,3,,,automatic_ball,B,,,
+824053,642100,"Neto, Zach",11,Bot,94,2,,,automatic_ball,B,,,
+824053,642100,"Neto, Zach",11,Bot,94,1,,,automatic_ball,B,,,
+824053,642100,"Neto, Zach",11,Bot,94,4,,,automatic_ball,B,intent_walk,Gabe Speier intentionally walks Zach Neto.,

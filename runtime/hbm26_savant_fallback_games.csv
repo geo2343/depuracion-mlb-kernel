@@ -1,8 +1,8 @@
-game_pk,raw_rows,pitch_type_rows,release_speed_rows,physical_rule_rows,box_pitch_sum,physical_delta,null_pitch_type_rows,null_type_with_speed,pitcher_mismatch
-823484,340,339,339,339,340,-1,1,0,1
-824702,272,271,271,271,271,0,1,0,0
-824861,293,293,293,293,293,0,0,0,0
-824458,277,277,277,277,277,0,0,0,0
-824053,379,375,375,375,375,0,4,0,0
-824051,340,340,340,340,340,0,0,0,0
-823565,248,247,247,247,248,-1,1,0,1
+game_pk,savant_raw_rows,automatic_rows_excluded,canonical_pitch_rows,box_pitch_sum,delta,pitchers_savant,pitchers_box,pitcher_mismatch
+823484,340,0,340,340,0,8,8,0
+824702,272,1,271,271,0,5,5,0
+824861,293,0,293,293,0,10,10,0
+824458,277,0,277,277,0,10,10,0
+824053,379,4,375,375,0,12,12,0
+824051,340,0,340,340,0,9,9,0
+823565,248,0,248,248,0,5,5,0
