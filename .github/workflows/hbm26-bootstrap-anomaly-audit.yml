@@ -1,0 +1,54 @@
+name: HBM26 Bootstrap Anomaly Audit
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-bootstrap-anomaly-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas
+      - name: Isolate anomalies
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd
+          out=Path('runtime')
+          recon=pd.read_csv(out/'hbm26_bootstrap_all_pitchers_recon.csv')
+          team=pd.read_csv(out/'hbm26_bootstrap_team_line_qa.csv')
+          cand=pd.read_csv(out/'hbm26_bootstrap_classification_candidates.csv')
+          bad=recon[(recon['pitch_count_match']!=True) | (recon['_merge']!='both')].copy()
+          cols=[c for c in ['date','game_pk','team','opp','pitcher_id','pitcher_name','boxscore_name','is_starter','role_mlb',
+                            'entry_inning','entry_half','pbp_pitches','boxscore_np','pitch_count_match','_merge','pbp_source','boxscore_source'] if c in bad.columns]
+          bad[cols].to_csv(out/'hbm26_bootstrap_pitch_mismatches.csv',index=False)
+          tf=team[team['team_line_match']!=True].copy()
+          tf.to_csv(out/'hbm26_bootstrap_team_line_failures.csv',index=False)
+          def strict_non_p(s):
+              pos=[x for x in str(s).split('|') if x and x!='nan']
+              return any(x!='P' for x in pos)
+          strict=cand[cand['all_positions'].map(strict_non_p)].copy()
+          strict['strict_reason']='NONSTARTER_HAS_NON_P_POSITION_IN_GAME'
+          strict.to_csv(out/'hbm26_bootstrap_position_player_candidates_strict.csv',index=False)
+          sm={'pitch_mismatch_rows':int(len(bad)),'pitch_mismatch_dates':sorted(bad['date'].dropna().astype(str).unique().tolist()),
+              'team_line_failure_rows':int(len(tf)),'team_line_failure_dates':sorted(tf['date'].dropna().astype(str).unique().tolist()),
+              'strict_position_player_candidates':int(len(strict)),'strict_candidate_names':strict['pitcher_name'].astype(str).tolist()}
+          (out/'hbm26_bootstrap_anomaly_summary.json').write_text(json.dumps(sm,indent=2),encoding='utf-8')
+          print(json.dumps(sm,indent=2))
+          PY
+      - name: Commit anomaly outputs
+        run: |
+          git config user.name 'hbm26-qa-bot'
+          git config user.email 'hbm26-qa-bot@users.noreply.github.com'
+          git add runtime/hbm26_bootstrap_pitch_mismatches.csv runtime/hbm26_bootstrap_team_line_failures.csv runtime/hbm26_bootstrap_position_player_candidates_strict.csv runtime/hbm26_bootstrap_anomaly_summary.json
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: isolate bootstrap anomalies'; git push; fi
