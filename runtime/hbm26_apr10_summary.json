@@ -1,0 +1,13 @@
+{
+  "date": "2026-04-10",
+  "game_pk_expected": 15,
+  "game_pk_parquet": 15,
+  "parquet_rows": 4300,
+  "boxscore_pitch_sum": 4300,
+  "pitchers_parquet": 132,
+  "pitchers_boxscore": 132,
+  "rows_reconciled": 132,
+  "exact_matches": 132,
+  "mismatches": 0,
+  "only_one_source": 0
+}
