@@ -1,0 +1,8 @@
+game_pk,pitcher,player_name,inning,inning_topbot,at_bat_number,pitch_number,pitch_type,release_speed,description,type,events,des,sv_id
+823484,664238,"Lile, Daylen",9,Top,84,2,,,hit_into_play,X,force_out,"Daylen Lile grounds into a force out, second baseman Edmundo Sosa to shortstop Trea Turner. James Wood scores. Luis García Jr. to 3rd. Brady House out at 2nd. Daylen Lile to 1st.",
+824702,664192,"Swanson, Dansby",5,Bot,42,7,,,automatic_ball,B,walk,Dansby Swanson walks.,
+824053,642100,"Neto, Zach",11,Bot,94,3,,,automatic_ball,B,,,
+824053,642100,"Neto, Zach",11,Bot,94,2,,,automatic_ball,B,,,
+824053,642100,"Neto, Zach",11,Bot,94,1,,,automatic_ball,B,,,
+824053,642100,"Neto, Zach",11,Bot,94,4,,,automatic_ball,B,intent_walk,Gabe Speier intentionally walks Zach Neto.,
+823565,677960,"Hernaiz, Darell",7,Top,46,1,,,blocked_ball,B,,,
