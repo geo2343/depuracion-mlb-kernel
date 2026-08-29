@@ -1,0 +1,287 @@
+name: HBM26 Bootstrap Backfill
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-bootstrap-backfill.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install --quiet pandas pyarrow requests
+      - name: Build chronological bootstrap through Apr 10
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, math, time
+          from collections import defaultdict
+          from datetime import date, datetime, timedelta, timezone
+          from pathlib import Path
+          import pandas as pd
+          import requests
+
+          REQUESTED_START = date(2026,3,26)
+          END = date(2026,4,10)
+          PRECHECK_START = date(2026,3,20)
+          OUT = Path('runtime'); OUT.mkdir(exist_ok=True)
+          PBP_BASE = 'https://raw.githubusercontent.com/lancebroz/mlb-pitcher-data/main/data/raw/2026/daily'
+          S = requests.Session()
+          S.headers.update({'User-Agent':'HBM-26-QA/1.0'})
+
+          # Known, source-traceable non-MLB competitive load discovered during pilot.
+          EXTRA_LOADS = [
+            {'pitcher_id':592094,'pitcher_name':'Jason Adam','date':'2026-04-05','game_pk':814796,
+             'pitches':17,'bf':None,'outs':None,'role':'REHAB_RELIEF','level':'MILB_REHAB',
+             'source':'https://baseballsavant.mlb.com/player-scroll/game?gamePk=814796&player_id=592094'}
+          ]
+
+          def daterange(a,b):
+              d=a
+              while d<=b:
+                  yield d
+                  d += timedelta(days=1)
+
+          def get_json(url, retries=4):
+              last=None
+              for i in range(retries):
+                  try:
+                      r=S.get(url,timeout=60); r.raise_for_status(); return r.json()
+                  except Exception as e:
+                      last=e; time.sleep(1.5*(i+1))
+              raise last
+
+          def schedule_for(d):
+              u=f'https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&date={d.isoformat()}'
+              js=get_json(u)
+              games=[]
+              for block in js.get('dates',[]):
+                  for g in block.get('games',[]):
+                      st=g.get('status',{})
+                      if st.get('abstractGameState') != 'Final':
+                          continue
+                      games.append({
+                        'game_pk':int(g['gamePk']), 'official_date':g.get('officialDate',d.isoformat()),
+                        'game_date_time':g.get('gameDate'), 'detailed_state':st.get('detailedState'),
+                        'away':g.get('teams',{}).get('away',{}).get('team',{}).get('abbreviation'),
+                        'home':g.get('teams',{}).get('home',{}).get('team',{}).get('abbreviation')})
+              return games
+
+          # Safety check: if MLB has final regular-season games before requested start, include them.
+          pre=[]
+          for d in daterange(PRECHECK_START, REQUESTED_START-timedelta(days=1)):
+              pre.extend(schedule_for(d))
+          actual_start = min([date.fromisoformat(x['official_date']) for x in pre], default=REQUESTED_START)
+
+          all_rows=[]; daily=[]; team_qa_rows=[]; classification_candidates=[]
+          schedules={}
+          for d in daterange(actual_start, END):
+              games=schedule_for(d); schedules[d.isoformat()]=games
+              expected_pks={g['game_pk'] for g in games}
+              game_meta={g['game_pk']:g for g in games}
+              if not games:
+                  daily.append({'date':d.isoformat(),'expected_games':0,'pbp_games':0,'game_delta':0,'pbp_pitch_rows':0,
+                                'box_pitch_sum':0,'pitch_delta':0,'pbp_pitchers':0,'box_pitchers':0,'exact_pitch_matches':0,
+                                'pitch_mismatches':0,'only_one_source':0,'team_line_failures':0,'classification_candidates':0,
+                                'pbp_file':'NOT_NEEDED','data_qa':'PASS_NO_GAMES'})
+                  continue
+
+              pq_url=f'{PBP_BASE}/{d.isoformat()}.parquet'
+              rr=S.get(pq_url,timeout=60)
+              if rr.status_code != 200:
+                  daily.append({'date':d.isoformat(),'expected_games':len(games),'pbp_games':0,'game_delta':-len(games),
+                                'pbp_pitch_rows':0,'box_pitch_sum':None,'pitch_delta':None,'pbp_pitchers':0,'box_pitchers':None,
+                                'exact_pitch_matches':0,'pitch_mismatches':None,'only_one_source':None,'team_line_failures':None,
+                                'classification_candidates':None,'pbp_file':f'HTTP_{rr.status_code}','data_qa':'REJECTED_PBP_FILE_MISSING'})
+                  continue
+              p=OUT/f'hbm26_{d.isoformat()}.parquet'; p.write_bytes(rr.content)
+              cols=['game_pk','pitcher_id','pitcher_name','inning','top_bottom','at_bat_number','pitch_number']
+              df=pd.read_parquet(p,columns=cols)
+              p.unlink(missing_ok=True)
+              df['game_pk']=pd.to_numeric(df['game_pk'],errors='coerce').astype('Int64')
+              df['pitcher_id']=pd.to_numeric(df['pitcher_id'],errors='coerce').astype('Int64')
+              df=df[df['game_pk'].isin(expected_pks)].copy()
+              df['_row_in_game']=df.groupby('game_pk').cumcount()+1
+              pbp=(df.groupby(['game_pk','pitcher_id','pitcher_name'],as_index=False)
+                     .agg(pbp_pitches=('pitch_number','size'),entry_inning=('inning','min'),
+                          first_play_index=('at_bat_number','min'),last_play_index=('at_bat_number','max'),
+                          first_pitch_row=('_row_in_game','min'),last_pitch_row=('_row_in_game','max')))
+              first=(df.sort_values(['game_pk','_row_in_game']).drop_duplicates(['game_pk','pitcher_id'])
+                       [['game_pk','pitcher_id','top_bottom']].rename(columns={'top_bottom':'entry_half'}))
+              pbp=pbp.merge(first,on=['game_pk','pitcher_id'],how='left')
+
+              box=[]; box_pitch_sum=0; team_line_failures=0; date_candidates=0
+              for gp in sorted(expected_pks):
+                  feed=get_json(f'https://statsapi.mlb.com/api/v1.1/game/{gp}/feed/live')
+                  gdt=feed.get('gameData',{}).get('datetime',{}).get('dateTime') or game_meta[gp].get('game_date_time')
+                  for side in ('away','home'):
+                      tm=feed['liveData']['boxscore']['teams'][side]
+                      opp_side='home' if side=='away' else 'away'
+                      team_abbr=(feed.get('gameData',{}).get('teams',{}).get(side,{}).get('abbreviation')
+                                 or game_meta[gp].get(side))
+                      opp_abbr=(feed.get('gameData',{}).get('teams',{}).get(opp_side,{}).get('abbreviation')
+                                or game_meta[gp].get(opp_side))
+                      porder=tm.get('pitchers',[]); starter=porder[0] if porder else None
+                      team_pitch=tm.get('teamStats',{}).get('pitching',{})
+                      sums=defaultdict(int)
+                      for pid in porder:
+                          pobj=tm.get('players',{}).get(f'ID{pid}',{})
+                          stat=pobj.get('stats',{}).get('pitching',{})
+                          np=stat.get('numberOfPitches')
+                          if np is None: continue
+                          box_pitch_sum += int(np)
+                          ip=str(stat.get('inningsPitched') or '0.0'); wh,_,fr=ip.partition('.')
+                          outs=int(wh)*3+int((fr or '0')[:1])
+                          allpos=[x.get('abbreviation') for x in (pobj.get('allPositions') or []) if x.get('abbreviation')]
+                          batting_order=pobj.get('battingOrder')
+                          is_starter=(pid==starter)
+                          # Candidate only; never auto-exclude from this signal alone.
+                          pp_candidate=(not is_starter) and (batting_order is not None or any(x!='P' for x in allpos))
+                          if pp_candidate:
+                              date_candidates += 1
+                              classification_candidates.append({'date':d.isoformat(),'game_pk':gp,'pitcher_id':int(pid),
+                                'pitcher_name':pobj.get('person',{}).get('fullName'),'team':team_abbr,'all_positions':'|'.join(allpos),
+                                'batting_order':batting_order,'reason':'NONSTARTER_WITH_BATTING_ORDER_OR_NON_P_POSITION','review_status':'REVIEW_REQUIRED'})
+                          vals={
+                            'bf':int(stat.get('battersFaced') or 0),'outs':outs,'r':int(stat.get('runs') or 0),
+                            'er':int(stat.get('earnedRuns') or 0),'h':int(stat.get('hits') or 0),
+                            'bb':int(stat.get('baseOnBalls') or 0),'k':int(stat.get('strikeOuts') or 0),
+                            'hr':int(stat.get('homeRuns') or 0)}
+                          for k,v in vals.items(): sums[k]+=v
+                          box.append({'date':d.isoformat(),'game_pk':gp,'game_date_time':gdt,'team':team_abbr,'opp':opp_abbr,
+                                      'home_away':'A' if side=='away' else 'H','pitcher_id':int(pid),
+                                      'boxscore_name':pobj.get('person',{}).get('fullName'),'is_starter':is_starter,
+                                      'role_mlb':'STARTER' if is_starter else 'RELIEF_OR_BULK','boxscore_np':int(np),
+                                      'bf':vals['bf'],'outs':vals['outs'],'r':vals['r'],'er':vals['er'],'h':vals['h'],
+                                      'bb':vals['bb'],'k':vals['k'],'hr':vals['hr'],'all_positions':'|'.join(allpos),
+                                      'batting_order':batting_order,'position_player_candidate':pp_candidate,
+                                      'boxscore_source':f'https://statsapi.mlb.com/api/v1.1/game/{gp}/feed/live'})
+                      # Team aggregate reconciliation of the official individual line.
+                      checks={
+                        'bf':int(team_pitch.get('battersFaced') or 0),'outs':int(float(team_pitch.get('inningsPitched') or 0)*3+1e-9),
+                        'r':int(team_pitch.get('runs') or 0),'er':int(team_pitch.get('earnedRuns') or 0),
+                        'h':int(team_pitch.get('hits') or 0),'bb':int(team_pitch.get('baseOnBalls') or 0),
+                        'k':int(team_pitch.get('strikeOuts') or 0),'hr':int(team_pitch.get('homeRuns') or 0)}
+                      # inningsPitched decimal .1/.2 is not a decimal fraction; repair outs separately.
+                      tip=str(team_pitch.get('inningsPitched') or '0.0'); tw,_,tf=tip.partition('.'); checks['outs']=int(tw)*3+int((tf or '0')[:1])
+                      ok=all(sums[x]==checks[x] for x in checks)
+                      if not ok: team_line_failures += 1
+                      team_qa_rows.append({'date':d.isoformat(),'game_pk':gp,'team':team_abbr,
+                          **{f'sum_{k}':sums[k] for k in checks},**{f'team_{k}':checks[k] for k in checks},'team_line_match':ok})
+
+              boxdf=pd.DataFrame(box)
+              recon=pbp.merge(boxdf,on=['game_pk','pitcher_id'],how='outer',indicator=True)
+              recon['pitch_count_match']=recon['pbp_pitches'].eq(recon['boxscore_np'])
+              recon['name_match']=recon['pitcher_name'].fillna('').str.casefold().eq(recon['boxscore_name'].fillna('').str.casefold())
+              recon['pbp_source']=pq_url
+              recon['data_qa']=recon.apply(lambda x:'QA_VALIDATED' if x['_merge']=='both' and bool(x['pitch_count_match']) else 'QA_REVIEW',axis=1)
+              all_rows.extend(recon.to_dict('records'))
+              only=int((recon['_merge']!='both').sum())
+              mism=int((~recon['pitch_count_match'].fillna(False)).sum())
+              exact=int(recon['pitch_count_match'].fillna(False).sum())
+              pbp_games=int(df['game_pk'].nunique())
+              pitch_rows=int(len(df))
+              data_pass=(pbp_games==len(expected_pks) and pitch_rows==box_pitch_sum and only==0 and mism==0 and team_line_failures==0)
+              daily.append({'date':d.isoformat(),'expected_games':len(expected_pks),'pbp_games':pbp_games,
+                            'game_delta':pbp_games-len(expected_pks),'pbp_pitch_rows':pitch_rows,'box_pitch_sum':box_pitch_sum,
+                            'pitch_delta':pitch_rows-box_pitch_sum,'pbp_pitchers':int(len(pbp)),'box_pitchers':int(len(boxdf)),
+                            'exact_pitch_matches':exact,'pitch_mismatches':mism,'only_one_source':only,
+                            'team_line_failures':team_line_failures,'classification_candidates':date_candidates,
+                            'pbp_file':pq_url,'data_qa':'PASS' if data_pass else 'QA_REVIEW'})
+
+          alldf=pd.DataFrame(all_rows)
+          if len(alldf):
+              # Standardize IDs/names and retain only records present in both routes for workload computation.
+              both=alldf[alldf['_merge']=='both'].copy()
+              both['pitcher_id']=both['pitcher_id'].astype('int64')
+              both['game_pk']=both['game_pk'].astype('int64')
+              both['event_dt']=pd.to_datetime(both['game_date_time'],utc=True,errors='coerce')
+              both['event_date']=pd.to_datetime(both['date']).dt.date
+              both=both.sort_values(['event_dt','game_pk','pitcher_id']).reset_index(drop=True)
+
+              extra_by=defaultdict(list)
+              for x in EXTRA_LOADS:
+                  extra_by[int(x['pitcher_id'])].append({**x,'event_date':date.fromisoformat(x['date']),'event_dt':pd.Timestamp(x['date']+'T12:00:00Z')})
+              hist=defaultdict(list); workload=[]
+              for _,r in both.iterrows():
+                  pid=int(r['pitcher_id']); curdate=r['event_date']; curdt=r['event_dt']
+                  prior=list(hist[pid])
+                  prior += [x for x in extra_by.get(pid,[]) if x['event_dt'] < curdt]
+                  prior=sorted(prior,key=lambda x:x['event_dt'])
+                  prev=prior[-1] if prior else None
+                  if prev:
+                      gap=(curdate-prev['event_date']).days
+                      same_day=(gap==0)
+                      days_rest=None if same_day else max(gap-1,0)
+                      prev_pitches=prev.get('pitches'); prev_bf=prev.get('bf'); prev_outs=prev.get('outs')
+                      prev_role=prev.get('role'); prev_level=prev.get('level'); prev_game_pk=prev.get('game_pk')
+                  else:
+                      gap=None; same_day=False; days_rest=None; prev_pitches=prev_bf=prev_outs=None
+                      prev_role=prev_level=prev_game_pk=None
+                  win2=[x for x in prior if 0 <= (curdate-x['event_date']).days <= 2]
+                  win3=[x for x in prior if 0 <= (curdate-x['event_date']).days <= 3]
+                  p2=sum(int(x['pitches']) for x in win2 if x.get('pitches') is not None)
+                  p3=sum(int(x['pitches']) for x in win3 if x.get('pitches') is not None)
+                  bf2=None if any(x.get('bf') is None for x in win2) else sum(int(x['bf']) for x in win2)
+                  bf3=None if any(x.get('bf') is None for x in win3) else sum(int(x['bf']) for x in win3)
+                  dates={x['event_date'] for x in prior}
+                  b2b=(curdate-timedelta(days=1)) in dates
+                  three=(curdate-timedelta(days=1)) in dates and (curdate-timedelta(days=2)) in dates
+                  workload.append({
+                    'date':r['date'],'game_pk':int(r['game_pk']),'game_date_time':r['game_date_time'],'team':r['team'],'opp':r['opp'],
+                    'home_away':r['home_away'],'pitcher_id':pid,'pitcher_name':r['boxscore_name'],'is_starter':bool(r['is_starter']),
+                    'current_role':r['role_mlb'],'current_pitches':int(r['boxscore_np']),'current_bf':int(r['bf']),'current_outs':int(r['outs']),
+                    'r':int(r['r']),'er':int(r['er']),'h':int(r['h']),'bb':int(r['bb']),'k':int(r['k']),'hr':int(r['hr']),
+                    'pitch_count_match':bool(r['pitch_count_match']),'data_qa':r['data_qa'],'position_player_candidate':bool(r['position_player_candidate']),
+                    'prev_game_pk':prev_game_pk,'prev_role':prev_role,'prev_level':prev_level,'days_rest':days_rest,
+                    'same_day_repeat':same_day,'prev_pitches':prev_pitches,'prev_bf':prev_bf,'prev_outs':prev_outs,
+                    'pitches_2d':p2,'pitches_3d':p3,'bf_2d':bf2,'bf_3d':bf3,'b2b':b2b,'three_days_3':three,
+                    'pbp_source':r['pbp_source'],'boxscore_source':r['boxscore_source']})
+                  hist[pid].append({'event_date':curdate,'event_dt':curdt,'game_pk':int(r['game_pk']),'pitches':int(r['boxscore_np']),
+                                    'bf':int(r['bf']),'outs':int(r['outs']),'role':r['role_mlb'],'level':'MLB'})
+              workdf=pd.DataFrame(workload)
+          else:
+              both=pd.DataFrame(); workdf=pd.DataFrame()
+
+          daily_df=pd.DataFrame(daily)
+          daily_df.to_csv(OUT/'hbm26_bootstrap_daily_qa.csv',index=False)
+          pd.DataFrame(team_qa_rows).to_csv(OUT/'hbm26_bootstrap_team_line_qa.csv',index=False)
+          pd.DataFrame(classification_candidates).to_csv(OUT/'hbm26_bootstrap_classification_candidates.csv',index=False)
+          if len(alldf): alldf.to_csv(OUT/'hbm26_bootstrap_all_pitchers_recon.csv',index=False)
+          if len(workdf):
+              workdf.to_csv(OUT/'hbm26_bootstrap_workload_all_pitchers.csv',index=False)
+              workdf[~workdf['is_starter']].to_csv(OUT/'hbm26_bootstrap_nonstarters.csv',index=False)
+
+          summary={
+            'requested_start':REQUESTED_START.isoformat(),'actual_start':actual_start.isoformat(),'end':END.isoformat(),
+            'prestart_regular_games_found':len(pre),'dates_processed':int(len(daily_df)),
+            'dates_pass':int((daily_df['data_qa'].astype(str).str.startswith('PASS')).sum()),
+            'dates_review':int((~daily_df['data_qa'].astype(str).str.startswith('PASS')).sum()),
+            'expected_games_total':int(daily_df['expected_games'].fillna(0).sum()),
+            'pbp_pitch_rows_total':int(daily_df['pbp_pitch_rows'].fillna(0).sum()),
+            'box_pitch_sum_total':int(daily_df['box_pitch_sum'].fillna(0).sum()),
+            'pitch_mismatches_total':int(daily_df['pitch_mismatches'].fillna(0).sum()),
+            'only_one_source_total':int(daily_df['only_one_source'].fillna(0).sum()),
+            'team_line_failures_total':int(daily_df['team_line_failures'].fillna(0).sum()),
+            'classification_candidates_total':int(daily_df['classification_candidates'].fillna(0).sum()),
+            'all_pitcher_appearances':int(len(workdf)) if len(workdf) else 0,
+            'nonstarter_appearances':int((~workdf['is_starter']).sum()) if len(workdf) else 0,
+            'manual_extra_loads':EXTRA_LOADS}
+          (OUT/'hbm26_bootstrap_summary.json').write_text(json.dumps(summary,indent=2,default=str),encoding='utf-8')
+          print(json.dumps(summary,indent=2,default=str))
+          PY
+      - name: Commit bootstrap outputs
+        run: |
+          git config user.name 'hbm26-qa-bot'
+          git config user.email 'hbm26-qa-bot@users.noreply.github.com'
+          git add runtime/hbm26_bootstrap_*.csv runtime/hbm26_bootstrap_summary.json
+          if git diff --cached --quiet; then echo 'No changes to commit'; else git commit -m 'HBM-26: bootstrap chronological backfill through Apr 10'; git push; fi
