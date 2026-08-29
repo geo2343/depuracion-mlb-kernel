@@ -3,29 +3,35 @@
   "game_rows": [
     {
       "game_pk": 823484,
-      "savant_rows": 340,
+      "savant_raw_rows": 340,
+      "savant_physical_pitch_rows": 339,
       "box_pitch_sum": 340,
-      "delta": 0,
+      "delta": -1,
+      "non_pitch_rows_removed": 1,
       "pitchers_savant": 8,
       "pitchers_box": 8,
-      "exact": 8,
-      "mismatch": 0
-    },
-    {
-      "game_pk": 824702,
-      "savant_rows": 272,
-      "box_pitch_sum": 271,
-      "delta": 1,
-      "pitchers_savant": 5,
-      "pitchers_box": 5,
-      "exact": 4,
+      "exact": 7,
       "mismatch": 1
     },
     {
+      "game_pk": 824702,
+      "savant_raw_rows": 272,
+      "savant_physical_pitch_rows": 271,
+      "box_pitch_sum": 271,
+      "delta": 0,
+      "non_pitch_rows_removed": 1,
+      "pitchers_savant": 5,
+      "pitchers_box": 5,
+      "exact": 5,
+      "mismatch": 0
+    },
+    {
       "game_pk": 824861,
-      "savant_rows": 293,
+      "savant_raw_rows": 293,
+      "savant_physical_pitch_rows": 293,
       "box_pitch_sum": 293,
       "delta": 0,
+      "non_pitch_rows_removed": 0,
       "pitchers_savant": 10,
       "pitchers_box": 10,
       "exact": 10,
@@ -33,9 +39,11 @@
     },
     {
       "game_pk": 824458,
-      "savant_rows": 277,
+      "savant_raw_rows": 277,
+      "savant_physical_pitch_rows": 277,
       "box_pitch_sum": 277,
       "delta": 0,
+      "non_pitch_rows_removed": 0,
       "pitchers_savant": 10,
       "pitchers_box": 10,
       "exact": 10,
@@ -43,19 +51,23 @@
     },
     {
       "game_pk": 824053,
-      "savant_rows": 379,
+      "savant_raw_rows": 379,
+      "savant_physical_pitch_rows": 375,
       "box_pitch_sum": 375,
-      "delta": 4,
+      "delta": 0,
+      "non_pitch_rows_removed": 4,
       "pitchers_savant": 12,
       "pitchers_box": 12,
-      "exact": 11,
-      "mismatch": 1
+      "exact": 12,
+      "mismatch": 0
     },
     {
       "game_pk": 824051,
-      "savant_rows": 340,
+      "savant_raw_rows": 340,
+      "savant_physical_pitch_rows": 340,
       "box_pitch_sum": 340,
       "delta": 0,
+      "non_pitch_rows_removed": 0,
       "pitchers_savant": 9,
       "pitchers_box": 9,
       "exact": 9,
@@ -63,13 +75,15 @@
     },
     {
       "game_pk": 823565,
-      "savant_rows": 248,
+      "savant_raw_rows": 248,
+      "savant_physical_pitch_rows": 247,
       "box_pitch_sum": 248,
-      "delta": 0,
+      "delta": -1,
+      "non_pitch_rows_removed": 1,
       "pitchers_savant": 5,
       "pitchers_box": 5,
-      "exact": 5,
-      "mismatch": 0
+      "exact": 4,
+      "mismatch": 1
     }
   ],
   "pitcher_rows": 59,
@@ -77,19 +91,19 @@
   "pitcher_mismatches": 2,
   "bad": [
     {
-      "game_pk": 824702,
-      "pitcher": 664192,
-      "savant_pitches": 30,
-      "box_np": 29,
-      "delta": 1,
+      "game_pk": 823484,
+      "pitcher": 664238,
+      "savant_pitches": 7,
+      "box_np": 8,
+      "delta": -1,
       "_merge": "both"
     },
     {
-      "game_pk": 824053,
-      "pitcher": 642100,
-      "savant_pitches": 7,
-      "box_np": 3,
-      "delta": 4,
+      "game_pk": 823565,
+      "pitcher": 677960,
+      "savant_pitches": 100,
+      "box_np": 101,
+      "delta": -1,
       "_merge": "both"
     }
   ]
