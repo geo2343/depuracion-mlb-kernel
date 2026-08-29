@@ -1,0 +1,81 @@
+{
+  "nonstarters": 1382,
+  "unique_nonstarter_pitchers": 299,
+  "bullpen_appearances": 1374,
+  "position_player_pitching_appearances": 8,
+  "position_player_rows": [
+    {
+      "FECHA": "2026-03-30",
+      "GAME_PK": 823484,
+      "TEAM": "PHI",
+      "MLBAM_ID": 664238,
+      "PITCHER": "Dylan Moore",
+      "PRIMARY_POSITION": "CF",
+      "PRIMARY_POSITION_NAME": "Outfielder"
+    },
+    {
+      "FECHA": "2026-03-30",
+      "GAME_PK": 822834,
+      "TEAM": "TOR",
+      "MLBAM_ID": 623168,
+      "PITCHER": "Tyler Heineman",
+      "PRIMARY_POSITION": "C",
+      "PRIMARY_POSITION_NAME": "Catcher"
+    },
+    {
+      "FECHA": "2026-04-02",
+      "GAME_PK": 825105,
+      "TEAM": "AZ",
+      "MLBAM_ID": 543510,
+      "PITCHER": "James McCann",
+      "PRIMARY_POSITION": "C",
+      "PRIMARY_POSITION_NAME": "Catcher"
+    },
+    {
+      "FECHA": "2026-04-04",
+      "GAME_PK": 823239,
+      "TEAM": "SF",
+      "MLBAM_ID": 683766,
+      "PITCHER": "Christian Koss",
+      "PRIMARY_POSITION": "3B",
+      "PRIMARY_POSITION_NAME": "Third Base"
+    },
+    {
+      "FECHA": "2026-04-06",
+      "GAME_PK": 822832,
+      "TEAM": "LAD",
+      "MLBAM_ID": 500743,
+      "PITCHER": "Miguel Rojas",
+      "PRIMARY_POSITION": "2B",
+      "PRIMARY_POSITION_NAME": "Second Base"
+    },
+    {
+      "FECHA": "2026-04-06",
+      "GAME_PK": 822832,
+      "TEAM": "TOR",
+      "MLBAM_ID": 623168,
+      "PITCHER": "Tyler Heineman",
+      "PRIMARY_POSITION": "C",
+      "PRIMARY_POSITION_NAME": "Catcher"
+    },
+    {
+      "FECHA": "2026-04-08",
+      "GAME_PK": 824455,
+      "TEAM": "KC",
+      "MLBAM_ID": 686475,
+      "PITCHER": "Tyler Tolbert",
+      "PRIMARY_POSITION": "SS",
+      "PRIMARY_POSITION_NAME": "Shortstop"
+    },
+    {
+      "FECHA": "2026-04-10",
+      "GAME_PK": 824534,
+      "TEAM": "CIN",
+      "MLBAM_ID": 664731,
+      "PITCHER": "P.J. Higgins",
+      "PRIMARY_POSITION": "C",
+      "PRIMARY_POSITION_NAME": "Catcher"
+    }
+  ],
+  "rule": "PRIMARY_POSITION P/TWP = bullpen-capable; other primary positions = POSITION_PLAYER_PITCHING for a nonstarter pitching appearance"
+}
