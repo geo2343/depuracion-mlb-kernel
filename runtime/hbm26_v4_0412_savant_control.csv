@@ -1,0 +1,16 @@
+date,game_pk,savant_pitches,boxscore_pitches,delta,pitcher_mismatches,status,source
+2026-04-12,822828,330,330,0,0,PASS,https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk=822828
+2026-04-12,822998,255,255,0,0,PASS,https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk=822998
+2026-04-12,823075,280,280,0,0,PASS,https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk=823075
+2026-04-12,823154,260,260,0,0,PASS,https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk=823154
+2026-04-12,823317,285,285,0,1,QA_REVIEW,https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk=823317
+2026-04-12,823479,293,293,0,0,PASS,https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk=823479
+2026-04-12,823642,256,256,0,0,PASS,https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk=823642
+2026-04-12,823804,268,268,0,0,PASS,https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk=823804
+2026-04-12,823966,327,327,0,0,PASS,https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk=823966
+2026-04-12,824126,282,282,0,0,PASS,https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk=824126
+2026-04-12,824293,262,262,0,0,PASS,https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk=824293
+2026-04-12,824533,343,343,0,0,PASS,https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk=824533
+2026-04-12,824696,324,324,0,0,PASS,https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk=824696
+2026-04-12,824859,298,298,0,0,PASS,https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk=824859
+2026-04-12,824938,296,296,0,0,PASS,https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk=824938
