@@ -1,0 +1,72 @@
+name: HBM26 Suspended Game Audit
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-suspended-game-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas requests
+      - name: Audit duplicate game pks and event dates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd
+          import requests
+
+          OUT=Path('runtime')
+          df=pd.read_csv(OUT/'hbm26_canonical_nonstarters_classified.csv')
+          dup=(df.groupby('GAME_PK').agg(rows=('GAME_PK','size'),dates=('FECHA',lambda x:'|'.join(sorted(set(map(str,x))))),date_n=('FECHA','nunique')).reset_index())
+          dup=dup[dup.date_n>1].copy()
+          S=requests.Session(); S.headers.update({'User-Agent':'HBM26-suspended-audit'})
+          details=[]
+          for gp in dup.GAME_PK.astype(int).tolist():
+              feed=S.get(f'https://statsapi.mlb.com/api/v1.1/game/{gp}/feed/live',timeout=60).json()
+              gd=feed.get('gameData',{}); ld=feed.get('liveData',{})
+              dt=gd.get('datetime',{})
+              status=gd.get('status',{})
+              plays=ld.get('plays',{}).get('allPlays',[])
+              event_times=[]
+              for p in plays:
+                  for ev in p.get('playEvents',[]):
+                      for k in ('startTime','endTime'):
+                          v=ev.get(k)
+                          if v: event_times.append(v)
+              details.append({
+                  'game_pk':gp,
+                  'officialDate':dt.get('officialDate'),
+                  'dateTime':dt.get('dateTime'),
+                  'originalDate':dt.get('originalDate'),
+                  'detailedState':status.get('detailedState'),
+                  'abstractGameState':status.get('abstractGameState'),
+                  'codedGameState':status.get('codedGameState'),
+                  'event_time_min':min(event_times) if event_times else None,
+                  'event_time_max':max(event_times) if event_times else None,
+                  'event_dates':'|'.join(sorted(set(x[:10] for x in event_times if len(x)>=10))),
+                  'rescheduledFrom':dt.get('rescheduledFrom'),
+                  'rescheduledDate':dt.get('rescheduledDate'),
+              })
+          dup.to_csv(OUT/'hbm26_duplicate_gamepk_dates.csv',index=False)
+          pd.DataFrame(details).to_csv(OUT/'hbm26_suspended_game_details.csv',index=False)
+          sm={'duplicate_game_pks_across_dates':len(dup),'duplicates':dup.to_dict('records'),'details':details}
+          (OUT/'hbm26_suspended_game_summary.json').write_text(json.dumps(sm,indent=2,default=str),encoding='utf-8')
+          print(json.dumps(sm,indent=2,default=str))
+          PY
+      - name: Commit audit
+        run: |
+          git config user.name 'hbm26-qa-bot'
+          git config user.email 'hbm26-qa-bot@users.noreply.github.com'
+          git add runtime/hbm26_duplicate_gamepk_dates.csv runtime/hbm26_suspended_game_details.csv runtime/hbm26_suspended_game_summary.json
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: audit suspended/resumed duplicate games'; git push; fi
