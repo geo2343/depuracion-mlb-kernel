@@ -1,0 +1,4 @@
+game_pk,officialDate,dateTime,originalDate,detailedState,abstractGameState,codedGameState,event_time_min,event_time_max,event_dates,rescheduledFrom,rescheduledDate
+824134,2026-04-04,2026-04-04T23:10:00Z,2026-04-04,Final,Final,F,2026-04-04T22:00:36.864Z,2026-04-05T01:56:28.435Z,2026-04-04|2026-04-05,,
+824460,2026-04-05,2026-04-05T17:15:00Z,2026-04-05,Final,Final,F,2026-04-05T20:06:48.701Z,2026-04-05T23:32:59.436Z,2026-04-05,,
+824621,2026-04-03,2026-04-03T18:10:00Z,2026-04-03,Final,Final,F,2026-04-03T14:42:47.807Z,2026-04-03T21:07:25.086Z,2026-04-03,,

@@ -1,0 +1,67 @@
+{
+  "duplicate_game_pks_across_dates": 3,
+  "duplicates": [
+    {
+      "GAME_PK": 824134,
+      "rows": 10,
+      "dates": "2026-04-03|2026-04-04",
+      "date_n": 2
+    },
+    {
+      "GAME_PK": 824460,
+      "rows": 14,
+      "dates": "2026-04-04|2026-04-05",
+      "date_n": 2
+    },
+    {
+      "GAME_PK": 824621,
+      "rows": 18,
+      "dates": "2026-04-02|2026-04-03",
+      "date_n": 2
+    }
+  ],
+  "details": [
+    {
+      "game_pk": 824134,
+      "officialDate": "2026-04-04",
+      "dateTime": "2026-04-04T23:10:00Z",
+      "originalDate": "2026-04-04",
+      "detailedState": "Final",
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "event_time_min": "2026-04-04T22:00:36.864Z",
+      "event_time_max": "2026-04-05T01:56:28.435Z",
+      "event_dates": "2026-04-04|2026-04-05",
+      "rescheduledFrom": null,
+      "rescheduledDate": null
+    },
+    {
+      "game_pk": 824460,
+      "officialDate": "2026-04-05",
+      "dateTime": "2026-04-05T17:15:00Z",
+      "originalDate": "2026-04-05",
+      "detailedState": "Final",
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "event_time_min": "2026-04-05T20:06:48.701Z",
+      "event_time_max": "2026-04-05T23:32:59.436Z",
+      "event_dates": "2026-04-05",
+      "rescheduledFrom": null,
+      "rescheduledDate": null
+    },
+    {
+      "game_pk": 824621,
+      "officialDate": "2026-04-03",
+      "dateTime": "2026-04-03T18:10:00Z",
+      "originalDate": "2026-04-03",
+      "detailedState": "Final",
+      "abstractGameState": "Final",
+      "codedGameState": "F",
+      "event_time_min": "2026-04-03T14:42:47.807Z",
+      "event_time_max": "2026-04-03T21:07:25.086Z",
+      "event_dates": "2026-04-03",
+      "rescheduledFrom": null,
+      "rescheduledDate": null
+    }
+  ]
+}
