@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install --quiet pandas requests
-      - name: Compare Savant CSV to official boxscore
+      - name: Compare Savant physical pitches to official boxscore
         run: |
           python - <<'PY'
           import io, json, time
@@ -33,24 +33,26 @@ jobs:
           for gp in GAME_PKS:
               url=f'https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk={gp}'
               r=S.get(url,timeout=90); r.raise_for_status()
-              txt=r.text
-              df=pd.read_csv(io.StringIO(txt))
-              if 'game_pk' in df.columns:
-                  df=df[pd.to_numeric(df['game_pk'],errors='coerce')==gp].copy()
-              # Savant uses pitcher MLBAM ID per pitch.
+              raw=pd.read_csv(io.StringIO(r.text))
+              if 'game_pk' in raw.columns:
+                  raw=raw[pd.to_numeric(raw['game_pk'],errors='coerce')==gp].copy()
+              raw_rows=len(raw)
+              # Physical pitch only: Statcast CSV can contain non-pitch rows (automatic ball/strike, actions).
+              if 'pitch_type' not in raw.columns:
+                  raise RuntimeError('Savant CSV missing pitch_type')
+              df=raw[raw['pitch_type'].notna() & raw['pitch_type'].astype(str).str.strip().ne('')].copy()
               df['pitcher']=pd.to_numeric(df['pitcher'],errors='coerce').astype('Int64')
               grouped=(df.dropna(subset=['pitcher']).groupby('pitcher',as_index=False)
                          .agg(savant_pitches=('pitcher','size'),
-                              savant_name=('player_name','first') if 'player_name' in df.columns else ('pitcher','size'),
-                              entry_inning=('inning','min') if 'inning' in df.columns else ('pitcher','size'),
-                              first_at_bat=('at_bat_number','min') if 'at_bat_number' in df.columns else ('pitcher','size'),
-                              last_at_bat=('at_bat_number','max') if 'at_bat_number' in df.columns else ('pitcher','size')))
+                              savant_name=('player_name','first'),
+                              entry_inning=('inning','min'),
+                              first_at_bat=('at_bat_number','min'),
+                              last_at_bat=('at_bat_number','max')))
               feed=S.get(f'https://statsapi.mlb.com/api/v1.1/game/{gp}/feed/live',timeout=60).json()
               box=[]
               for side in ('away','home'):
                   tm=feed['liveData']['boxscore']['teams'][side]
-                  porder=tm.get('pitchers',[])
-                  for pid in porder:
+                  for pid in tm.get('pitchers',[]):
                       pobj=tm.get('players',{}).get(f'ID{pid}',{})
                       stat=pobj.get('stats',{}).get('pitching',{})
                       if stat.get('numberOfPitches') is None: continue
@@ -62,8 +64,9 @@ jobs:
               g['delta']=g['savant_pitches']-g['box_np']
               g['match']=g['delta'].eq(0) & g['_merge'].eq('both')
               rows.extend(g.to_dict('records'))
-              pitch_rows.append({'game_pk':gp,'savant_rows':int(len(df)),'box_pitch_sum':int(b['box_np'].sum()),
-                                 'delta':int(len(df)-b['box_np'].sum()),'pitchers_savant':int(len(grouped)),
+              pitch_rows.append({'game_pk':gp,'savant_raw_rows':int(raw_rows),'savant_physical_pitch_rows':int(len(df)),
+                                 'box_pitch_sum':int(b['box_np'].sum()),'delta':int(len(df)-b['box_np'].sum()),
+                                 'non_pitch_rows_removed':int(raw_rows-len(df)),'pitchers_savant':int(len(grouped)),
                                  'pitchers_box':int(len(b)),'exact':int(g['match'].fillna(False).sum()),
                                  'mismatch':int((~g['match'].fillna(False)).sum())})
               time.sleep(.5)
@@ -82,4 +85,4 @@ jobs:
           git config user.name 'hbm26-qa-bot'
           git config user.email 'hbm26-qa-bot@users.noreply.github.com'
           git add runtime/hbm26_savant_fallback_*.csv runtime/hbm26_savant_fallback_summary.json
-          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: Savant fallback audit'; git push; fi
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: Savant physical-pitch fallback audit'; git push; fi
