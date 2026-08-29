@@ -1,0 +1,85 @@
+name: HBM26 Savant Fallback Audit
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-savant-fallback-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas requests
+      - name: Compare Savant CSV to official boxscore
+        run: |
+          python - <<'PY'
+          import io, json, time
+          from pathlib import Path
+          import pandas as pd
+          import requests
+
+          GAME_PKS=[823484,824702,824861,824458,824053,824051,823565]
+          OUT=Path('runtime'); OUT.mkdir(exist_ok=True)
+          S=requests.Session(); S.headers.update({'User-Agent':'Mozilla/5.0 HBM26-QA'})
+          rows=[]; pitch_rows=[]
+          for gp in GAME_PKS:
+              url=f'https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk={gp}'
+              r=S.get(url,timeout=90); r.raise_for_status()
+              txt=r.text
+              df=pd.read_csv(io.StringIO(txt))
+              if 'game_pk' in df.columns:
+                  df=df[pd.to_numeric(df['game_pk'],errors='coerce')==gp].copy()
+              # Savant uses pitcher MLBAM ID per pitch.
+              df['pitcher']=pd.to_numeric(df['pitcher'],errors='coerce').astype('Int64')
+              grouped=(df.dropna(subset=['pitcher']).groupby('pitcher',as_index=False)
+                         .agg(savant_pitches=('pitcher','size'),
+                              savant_name=('player_name','first') if 'player_name' in df.columns else ('pitcher','size'),
+                              entry_inning=('inning','min') if 'inning' in df.columns else ('pitcher','size'),
+                              first_at_bat=('at_bat_number','min') if 'at_bat_number' in df.columns else ('pitcher','size'),
+                              last_at_bat=('at_bat_number','max') if 'at_bat_number' in df.columns else ('pitcher','size')))
+              feed=S.get(f'https://statsapi.mlb.com/api/v1.1/game/{gp}/feed/live',timeout=60).json()
+              box=[]
+              for side in ('away','home'):
+                  tm=feed['liveData']['boxscore']['teams'][side]
+                  porder=tm.get('pitchers',[])
+                  for pid in porder:
+                      pobj=tm.get('players',{}).get(f'ID{pid}',{})
+                      stat=pobj.get('stats',{}).get('pitching',{})
+                      if stat.get('numberOfPitches') is None: continue
+                      box.append({'pitcher':int(pid),'box_name':pobj.get('person',{}).get('fullName'),
+                                  'box_np':int(stat['numberOfPitches']),'team_side':side})
+              b=pd.DataFrame(box)
+              g=grouped.merge(b,on='pitcher',how='outer',indicator=True)
+              g['game_pk']=gp
+              g['delta']=g['savant_pitches']-g['box_np']
+              g['match']=g['delta'].eq(0) & g['_merge'].eq('both')
+              rows.extend(g.to_dict('records'))
+              pitch_rows.append({'game_pk':gp,'savant_rows':int(len(df)),'box_pitch_sum':int(b['box_np'].sum()),
+                                 'delta':int(len(df)-b['box_np'].sum()),'pitchers_savant':int(len(grouped)),
+                                 'pitchers_box':int(len(b)),'exact':int(g['match'].fillna(False).sum()),
+                                 'mismatch':int((~g['match'].fillna(False)).sum())})
+              time.sleep(.5)
+          out=pd.DataFrame(rows)
+          out.to_csv(OUT/'hbm26_savant_fallback_pitchers.csv',index=False)
+          pd.DataFrame(pitch_rows).to_csv(OUT/'hbm26_savant_fallback_games.csv',index=False)
+          bad=out[out['match']!=True]
+          sm={'games':len(GAME_PKS),'game_rows':pitch_rows,'pitcher_rows':int(len(out)),
+              'pitcher_exact':int(out['match'].fillna(False).sum()),'pitcher_mismatches':int(len(bad)),
+              'bad':bad[['game_pk','pitcher','savant_pitches','box_np','delta','_merge']].to_dict('records') if len(bad) else []}
+          (OUT/'hbm26_savant_fallback_summary.json').write_text(json.dumps(sm,indent=2,default=str),encoding='utf-8')
+          print(json.dumps(sm,indent=2,default=str))
+          PY
+      - name: Commit fallback audit
+        run: |
+          git config user.name 'hbm26-qa-bot'
+          git config user.email 'hbm26-qa-bot@users.noreply.github.com'
+          git add runtime/hbm26_savant_fallback_*.csv runtime/hbm26_savant_fallback_summary.json
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: Savant fallback audit'; git push; fi
