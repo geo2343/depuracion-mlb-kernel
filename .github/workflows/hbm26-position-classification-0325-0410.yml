@@ -1,0 +1,78 @@
+name: HBM26 Position Classification 0325-0410
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-position-classification-0325-0410.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas requests
+      - name: Resolve primary positions for every nonstarter
+        run: |
+          python - <<'PY'
+          import json, time
+          from pathlib import Path
+          import pandas as pd
+          import requests
+
+          OUT=Path('runtime')
+          src=OUT/'hbm26_canonical_nonstarters.csv'
+          df=pd.read_csv(src)
+          df['MLBAM_ID']=pd.to_numeric(df['MLBAM_ID'],errors='raise').astype(int)
+          ids=sorted(df['MLBAM_ID'].unique().tolist())
+          S=requests.Session(); S.headers.update({'User-Agent':'HBM-26-Position-QA/1.0'})
+          pos={}
+          def one(pid):
+              r=S.get(f'https://statsapi.mlb.com/api/v1/people/{pid}',timeout=45); r.raise_for_status()
+              p=(r.json().get('people') or [{}])[0]
+              pp=p.get('primaryPosition') or {}
+              return pp.get('abbreviation') or '', pp.get('name') or '', p.get('fullName') or ''
+          for i in range(0,len(ids),50):
+              batch=ids[i:i+50]
+              url='https://statsapi.mlb.com/api/v1/people?personIds='+','.join(map(str,batch))
+              try:
+                  r=S.get(url,timeout=60); r.raise_for_status(); people=r.json().get('people') or []
+                  got=set()
+                  for p in people:
+                      pid=int(p['id']); got.add(pid); pp=p.get('primaryPosition') or {}
+                      pos[pid]=(pp.get('abbreviation') or '',pp.get('name') or '',p.get('fullName') or '')
+                  for pid in batch:
+                      if pid not in got: pos[pid]=one(pid)
+              except Exception:
+                  for pid in batch:
+                      pos[pid]=one(pid); time.sleep(.03)
+              time.sleep(.1)
+          df['PRIMARY_POSITION']=df['MLBAM_ID'].map(lambda x:pos.get(int(x),('','',''))[0])
+          df['PRIMARY_POSITION_NAME']=df['MLBAM_ID'].map(lambda x:pos.get(int(x),('','',''))[1])
+          # TWP remains a professional pitching class. Every other non-P primary position is excluded from bullpen-arm calibration.
+          df['PITCHER_CLASS']=df['PRIMARY_POSITION'].map(lambda x:'BULLPEN_PITCHER' if x in ('P','TWP') else 'POSITION_PLAYER_PITCHING')
+          df['QA_STATUS']=df.apply(lambda r:'EXCLUIR_POSITION_PLAYER_PITCHING' if r['PITCHER_CLASS']=='POSITION_PLAYER_PITCHING' else 'QA_VALIDATED_CANONICAL',axis=1)
+          bull=df[df['PITCHER_CLASS']=='BULLPEN_PITCHER'].copy()
+          excl=df[df['PITCHER_CLASS']=='POSITION_PLAYER_PITCHING'].copy()
+          df.to_csv(OUT/'hbm26_canonical_nonstarters_classified.csv',index=False)
+          bull.to_csv(OUT/'hbm26_canonical_bullpen_classified.csv',index=False)
+          excl.to_csv(OUT/'hbm26_canonical_position_player_exclusions.csv',index=False)
+          names=excl[['FECHA','GAME_PK','TEAM','MLBAM_ID','PITCHER','PRIMARY_POSITION','PRIMARY_POSITION_NAME']].to_dict('records')
+          summary={'nonstarters':len(df),'unique_nonstarter_pitchers':len(ids),'bullpen_appearances':len(bull),
+                   'position_player_pitching_appearances':len(excl),'position_player_rows':names,
+                   'rule':'PRIMARY_POSITION P/TWP = bullpen-capable; other primary positions = POSITION_PLAYER_PITCHING for a nonstarter pitching appearance'}
+          (OUT/'hbm26_position_classification_summary.json').write_text(json.dumps(summary,indent=2,default=str),encoding='utf-8')
+          print(json.dumps(summary,indent=2,default=str))
+          PY
+      - name: Commit classification outputs
+        run: |
+          git config user.name 'hbm26-qa-bot'
+          git config user.email 'hbm26-qa-bot@users.noreply.github.com'
+          git add runtime/hbm26_canonical_*classified.csv runtime/hbm26_canonical_position_player_exclusions.csv runtime/hbm26_position_classification_summary.json
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: classify every nonstarter by official primary position'; git push; fi
