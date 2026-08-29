@@ -1,0 +1,4 @@
+date,game_pk,team,sum_bf,sum_outs,sum_r,sum_er,sum_h,sum_bb,sum_k,sum_hr,team_bf,team_outs,team_r,team_er,team_h,team_bb,team_k,team_hr,team_line_match
+2026-03-28,824213,LAA,44,24,11,5,13,5,12,0,44,24,11,3,13,5,12,0,False
+2026-04-01,823806,TB,36,24,8,5,9,2,10,1,36,24,8,4,9,2,10,1,False
+2026-04-02,825105,AZ,52,27,17,12,16,8,6,4,52,27,17,9,16,8,6,4,False

@@ -1,0 +1,22 @@
+{
+  "pitch_mismatch_rows": 12,
+  "pitch_mismatch_dates": [
+    "2026-03-30",
+    "2026-03-31",
+    "2026-04-03",
+    "2026-04-05",
+    "2026-04-07",
+    "2026-04-09"
+  ],
+  "team_line_failure_rows": 3,
+  "team_line_failure_dates": [
+    "2026-03-28",
+    "2026-04-01",
+    "2026-04-02"
+  ],
+  "strict_position_player_candidates": 2,
+  "strict_candidate_names": [
+    "James McCann",
+    "Tyler Heineman"
+  ]
+}
