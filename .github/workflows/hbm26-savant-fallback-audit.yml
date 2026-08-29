@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install --quiet pandas requests
-      - name: Distinguish physical pitches from automatic events
+      - name: Validate canonical Savant pitch rule
         run: |
           python - <<'PY'
           import io, json, time
@@ -29,21 +29,23 @@ jobs:
           GAME_PKS=[823484,824702,824861,824458,824053,824051,823565]
           OUT=Path('runtime'); OUT.mkdir(exist_ok=True)
           S=requests.Session(); S.headers.update({'User-Agent':'Mozilla/5.0 HBM26-QA'})
-          rows=[]; game_rows=[]; null_rows=[]
+          rows=[]; game_rows=[]; excluded_rows=[]
           for gp in GAME_PKS:
               url=f'https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk={gp}'
               raw=pd.read_csv(io.StringIO(S.get(url,timeout=90).text))
               if 'game_pk' in raw.columns:
                   raw=raw[pd.to_numeric(raw['game_pk'],errors='coerce')==gp].copy()
-              has_type=raw['pitch_type'].notna() & raw['pitch_type'].astype(str).str.strip().ne('')
-              has_speed=raw['release_speed'].notna() if 'release_speed' in raw.columns else pd.Series(False,index=raw.index)
-              physical=has_type | has_speed
-              null=raw[~has_type].copy()
-              for _,x in null.iterrows():
-                  null_rows.append({c:x.get(c) for c in ['game_pk','pitcher','player_name','inning','inning_topbot','at_bat_number','pitch_number','pitch_type','release_speed','description','type','events','des','sv_id']})
-              df=raw[physical].copy()
+              desc=raw['description'].fillna('').astype(str).str.lower() if 'description' in raw.columns else pd.Series('',index=raw.index)
+              automatic=desc.str.startswith('automatic_')
+              # Canonical counting rule: Savant row counts as an official pitch unless it is an automatic_* event.
+              # This preserves true unclassified physical pitches such as hit_into_play/blocked_ball with blank pitch_type.
+              df=raw[~automatic].copy()
+              for _,x in raw[automatic].iterrows():
+                  excluded_rows.append({c:x.get(c) for c in ['game_pk','pitcher','player_name','inning','inning_topbot','at_bat_number','pitch_number','pitch_type','release_speed','description','type','events','des','sv_id']})
               df['pitcher']=pd.to_numeric(df['pitcher'],errors='coerce').astype('Int64')
-              grouped=df.dropna(subset=['pitcher']).groupby('pitcher',as_index=False).agg(savant_pitches=('pitcher','size'))
+              grouped=(df.dropna(subset=['pitcher']).groupby('pitcher',as_index=False)
+                         .agg(savant_pitches=('pitcher','size'),entry_inning=('inning','min'),
+                              first_at_bat=('at_bat_number','min'),last_at_bat=('at_bat_number','max')))
               feed=S.get(f'https://statsapi.mlb.com/api/v1.1/game/{gp}/feed/live',timeout=60).json()
               box=[]
               for side in ('away','home'):
@@ -56,17 +58,18 @@ jobs:
               g=grouped.merge(b,on='pitcher',how='outer',indicator=True)
               g['game_pk']=gp; g['delta']=g['savant_pitches']-g['box_np']; g['match']=g['delta'].eq(0)&g['_merge'].eq('both')
               rows.extend(g.to_dict('records'))
-              game_rows.append({'game_pk':gp,'raw_rows':len(raw),'pitch_type_rows':int(has_type.sum()),'release_speed_rows':int(has_speed.sum()),
-                                'physical_rule_rows':int(physical.sum()),'box_pitch_sum':int(b['box_np'].sum()),
-                                'physical_delta':int(physical.sum()-b['box_np'].sum()),'null_pitch_type_rows':int((~has_type).sum()),
-                                'null_type_with_speed':int((~has_type & has_speed).sum()),'pitcher_mismatch':int((~g['match'].fillna(False)).sum())})
+              game_rows.append({'game_pk':gp,'savant_raw_rows':len(raw),'automatic_rows_excluded':int(automatic.sum()),
+                                'canonical_pitch_rows':len(df),'box_pitch_sum':int(b['box_np'].sum()),
+                                'delta':int(len(df)-b['box_np'].sum()),'pitchers_savant':len(grouped),'pitchers_box':len(b),
+                                'pitcher_mismatch':int((~g['match'].fillna(False)).sum())})
               time.sleep(.4)
           out=pd.DataFrame(rows); bad=out[out['match']!=True]
           out.to_csv(OUT/'hbm26_savant_fallback_pitchers.csv',index=False)
           pd.DataFrame(game_rows).to_csv(OUT/'hbm26_savant_fallback_games.csv',index=False)
-          pd.DataFrame(null_rows).to_csv(OUT/'hbm26_savant_null_pitch_type_rows.csv',index=False)
-          sm={'games':len(GAME_PKS),'game_rows':game_rows,'pitcher_rows':len(out),'pitcher_exact':int(out['match'].fillna(False).sum()),
-              'pitcher_mismatches':len(bad),'bad':bad[['game_pk','pitcher','savant_pitches','box_np','delta','_merge']].to_dict('records') if len(bad) else []}
+          pd.DataFrame(excluded_rows).to_csv(OUT/'hbm26_savant_automatic_events_excluded.csv',index=False)
+          sm={'rule':'COUNT_ALL_SAVANT_ROWS_EXCEPT_DESCRIPTION_AUTOMATIC_*','games':len(GAME_PKS),'game_rows':game_rows,
+              'pitcher_rows':len(out),'pitcher_exact':int(out['match'].fillna(False).sum()),'pitcher_mismatches':len(bad),
+              'bad':bad[['game_pk','pitcher','savant_pitches','box_np','delta','_merge']].to_dict('records') if len(bad) else []}
           (OUT/'hbm26_savant_fallback_summary.json').write_text(json.dumps(sm,indent=2,default=str),encoding='utf-8')
           print(json.dumps(sm,indent=2,default=str))
           PY
@@ -74,5 +77,5 @@ jobs:
         run: |
           git config user.name 'hbm26-qa-bot'
           git config user.email 'hbm26-qa-bot@users.noreply.github.com'
-          git add runtime/hbm26_savant_fallback_*.csv runtime/hbm26_savant_null_pitch_type_rows.csv runtime/hbm26_savant_fallback_summary.json
-          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: classify Savant no-pitch-type events'; git push; fi
+          git add runtime/hbm26_savant_fallback_*.csv runtime/hbm26_savant_automatic_events_excluded.csv runtime/hbm26_savant_fallback_summary.json
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: canonical Savant fallback rule'; git push; fi
