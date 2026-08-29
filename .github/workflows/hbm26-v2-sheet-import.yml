@@ -1,0 +1,48 @@
+name: HBM26 V2 Sheet Import
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-v2-sheet-import.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas
+      - name: Build 01_APARICIONES import
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          p='runtime/hbm26_v2_bullpen.csv'
+          df=pd.read_csv(p,keep_default_na=False)
+          out=pd.DataFrame()
+          fields=['RELIEVER_APPEARANCE_ID','GAME_PK','FECHA','TEAM','OPP','HOME_AWAY','MLBAM_ID','PITCHER','ROLE','DAYS_REST','PREV_PITCHES','PREV_BF','PREV_OUTS','PITCHES_2D','PITCHES_3D','BF_2D','BF_3D','B2B','THREE_DAYS_3','CURRENT_PITCHES','CURRENT_BF','CURRENT_OUTS','R','ER','H','BB','K','HR']
+          for c in fields: out[c]=df[c]
+          for c in ['RA9','ER9','WHIP','BB_PCT','K_PCT','HR9','WOBA_ALLOWED']: out[c]=''
+          out['SOURCE_URL']=''
+          out['QA_STATUS']=''
+          out['PREV_ROLE']=df['PREV_ROLE']
+          out['PREV_APPEARANCE_LEVEL']=df['PREV_APPEARANCE_LEVEL']
+          out['SAME_DAY_REPEAT']=df['SAME_DAY_REPEAT']
+          # deterministic fields regenerated in Sheet to reduce transfer volume
+          out['RELIEVER_APPEARANCE_ID']=''
+          out['ROLE']=''
+          order=['RELIEVER_APPEARANCE_ID','GAME_PK','FECHA','TEAM','OPP','HOME_AWAY','MLBAM_ID','PITCHER','ROLE','DAYS_REST','PREV_PITCHES','PREV_BF','PREV_OUTS','PITCHES_2D','PITCHES_3D','BF_2D','BF_3D','B2B','THREE_DAYS_3','CURRENT_PITCHES','CURRENT_BF','CURRENT_OUTS','R','ER','H','BB','K','HR','RA9','ER9','WHIP','BB_PCT','K_PCT','HR9','WOBA_ALLOWED','SOURCE_URL','QA_STATUS','PREV_ROLE','PREV_APPEARANCE_LEVEL','SAME_DAY_REPEAT']
+          out[order].to_csv('runtime/hbm26_v2_sheet01_lite.csv',index=False)
+          print({'rows':len(out),'cols':len(order),'first':out.iloc[0][['GAME_PK','FECHA','PITCHER']].to_dict(),'last':out.iloc[-1][['GAME_PK','FECHA','PITCHER']].to_dict()})
+          PY
+      - name: Commit import
+        run: |
+          git config user.name 'hbm26-qa-bot'
+          git config user.email 'hbm26-qa-bot@users.noreply.github.com'
+          git add runtime/hbm26_v2_sheet01_lite.csv
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: canonical V2 Sheet import'; git push; fi
