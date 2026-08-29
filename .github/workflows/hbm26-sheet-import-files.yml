@@ -1,0 +1,49 @@
+name: HBM26 Sheet Import Files
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-sheet-import-files.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas
+      - name: Build exact sheet schemas
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import pandas as pd
+          OUT=Path('runtime')
+          df=pd.read_csv(OUT/'hbm26_canonical_nonstarters_classified.csv')
+          bull=df[df['PITCHER_CLASS'].eq('BULLPEN_PITCHER')].copy()
+          cols01=['RELIEVER_APPEARANCE_ID','GAME_PK','FECHA','TEAM','OPP','HOME_AWAY','MLBAM_ID','PITCHER','ROLE','DAYS_REST',
+                  'PREV_PITCHES','PREV_BF','PREV_OUTS','PITCHES_2D','PITCHES_3D','BF_2D','BF_3D','B2B','THREE_DAYS_3',
+                  'CURRENT_PITCHES','CURRENT_BF','CURRENT_OUTS','R','ER','H','BB','K','HR']
+          out=bull[cols01].copy()
+          out['RA9']=''; out['ER9']=''; out['WHIP']=''; out['BB_PCT']=''; out['K_PCT']=''; out['HR9']=''; out['WOBA_ALLOWED']=''
+          out['SOURCE_URL']=bull['SOURCE_URL']; out['QA_STATUS']='QA_VALIDATED_CANONICAL'
+          out['PREV_ROLE']=bull['PREV_ROLE']; out['PREV_APPEARANCE_LEVEL']=bull['PREV_APPEARANCE_LEVEL']; out['SAME_DAY_REPEAT']=bull['SAME_DAY_REPEAT']
+          order=['RELIEVER_APPEARANCE_ID','GAME_PK','FECHA','TEAM','OPP','HOME_AWAY','MLBAM_ID','PITCHER','ROLE','DAYS_REST','PREV_PITCHES','PREV_BF','PREV_OUTS',
+                 'PITCHES_2D','PITCHES_3D','BF_2D','BF_3D','B2B','THREE_DAYS_3','CURRENT_PITCHES','CURRENT_BF','CURRENT_OUTS','R','ER','H','BB','K','HR',
+                 'RA9','ER9','WHIP','BB_PCT','K_PCT','HR9','WOBA_ALLOWED','SOURCE_URL','QA_STATUS','PREV_ROLE','PREV_APPEARANCE_LEVEL','SAME_DAY_REPEAT']
+          out[order].to_csv(OUT/'hbm26_sheet01_import.csv',index=False)
+          # Auditoria: keep every nonstarter with classification and source path.
+          df.to_csv(OUT/'hbm26_sheet10_import.csv',index=False)
+          print({'sheet01_rows':len(out),'audit_rows':len(df),'exclusions':int((df.PITCHER_CLASS=='POSITION_PLAYER_PITCHING').sum())})
+          PY
+      - name: Commit imports
+        run: |
+          git config user.name 'hbm26-qa-bot'
+          git config user.email 'hbm26-qa-bot@users.noreply.github.com'
+          git add runtime/hbm26_sheet01_import.csv runtime/hbm26_sheet10_import.csv
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: exact Sheet import files'; git push; fi
