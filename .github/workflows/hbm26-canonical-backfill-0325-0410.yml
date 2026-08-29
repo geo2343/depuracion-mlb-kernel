@@ -1,0 +1,235 @@
+name: HBM26 Canonical Backfill 0325-0410
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-canonical-backfill-0325-0410.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas pyarrow requests
+      - name: Build canonical corrected block
+        run: |
+          python - <<'PY'
+          import io, json, time
+          from collections import defaultdict
+          from datetime import date, timedelta
+          from pathlib import Path
+          import pandas as pd
+          import requests
+
+          START=date(2026,3,25); END=date(2026,4,10)
+          OUT=Path('runtime'); OUT.mkdir(exist_ok=True)
+          PBP_BASE='https://raw.githubusercontent.com/lancebroz/mlb-pitcher-data/main/data/raw/2026/daily'
+          S=requests.Session(); S.headers.update({'User-Agent':'HBM-26-Canonical/1.0'})
+          EXTRA_LOADS=[{'pitcher_id':592094,'pitcher_name':'Jason Adam','date':'2026-04-05','game_pk':814796,
+                        'pitches':17,'bf':None,'outs':None,'role':'REHAB_RELIEF','level':'MILB_REHAB',
+                        'source':'https://baseballsavant.mlb.com/player-scroll/game?gamePk=814796&player_id=592094'}]
+
+          def days(a,b):
+              d=a
+              while d<=b:
+                  yield d; d+=timedelta(days=1)
+          def get_json(url,retries=4):
+              last=None
+              for i in range(retries):
+                  try:
+                      r=S.get(url,timeout=75); r.raise_for_status(); return r.json()
+                  except Exception as e:
+                      last=e; time.sleep(1.2*(i+1))
+              raise last
+          def schedule(d):
+              js=get_json(f'https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameTypes=R&date={d.isoformat()}')
+              out=[]
+              for block in js.get('dates',[]):
+                  for g in block.get('games',[]):
+                      if g.get('status',{}).get('abstractGameState')!='Final': continue
+                      out.append({'game_pk':int(g['gamePk']),'game_dt':g.get('gameDate')})
+              return out
+          def ip_to_outs(ip):
+              s=str(ip or '0.0'); w,_,f=s.partition('.'); return int(w)*3+int((f or '0')[:1])
+          def savant_game(gp):
+              u=f'https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk={gp}'
+              r=S.get(u,timeout=120); r.raise_for_status(); df=pd.read_csv(io.StringIO(r.text))
+              if 'game_pk' in df.columns:
+                  df=df[pd.to_numeric(df['game_pk'],errors='coerce')==gp].copy()
+              desc=df['description'].fillna('').astype(str).str.lower() if 'description' in df.columns else pd.Series('',index=df.index)
+              df=df[~desc.str.startswith('automatic_')].copy()
+              df['pitcher_id']=pd.to_numeric(df['pitcher'],errors='coerce').astype('Int64')
+              df=df.dropna(subset=['pitcher_id']).copy(); df['pitcher_id']=df['pitcher_id'].astype('int64')
+              df['_ord']=range(1,len(df)+1)
+              g=(df.groupby('pitcher_id',as_index=False)
+                   .agg(pbp_pitches=('pitcher_id','size'),entry_inning=('inning','min'),
+                        first_play_index=('at_bat_number','min'),last_play_index=('at_bat_number','max'),
+                        first_pitch_row=('_ord','min'),last_pitch_row=('_ord','max')))
+              if 'inning_topbot' in df.columns:
+                  first=(df.sort_values('_ord').drop_duplicates('pitcher_id')[['pitcher_id','inning_topbot']]
+                           .rename(columns={'inning_topbot':'entry_half'}))
+                  g=g.merge(first,on='pitcher_id',how='left')
+              else: g['entry_half']=''
+              g['game_pk']=gp; g['pbp_source']=u; g['fallback_used']=True
+              return g
+
+          all_final=[]; daily=[]; exclusions=[]; teamqa=[]
+          person_cache={}
+          for d in days(START,END):
+              games=schedule(d); pks={x['game_pk'] for x in games}; meta={x['game_pk']:x for x in games}
+              if not games:
+                  daily.append({'date':d.isoformat(),'games':0,'pitch_rows':0,'box_pitch_sum':0,'pitch_delta':0,'mismatches':0,'fallback_games':0,'team_line_failures':0,'status':'PASS_NO_GAMES'})
+                  continue
+              pq_url=f'{PBP_BASE}/{d.isoformat()}.parquet'; rr=S.get(pq_url,timeout=90); rr.raise_for_status()
+              tmp=OUT/f'_x_{d.isoformat()}.parquet'; tmp.write_bytes(rr.content)
+              cols=['game_pk','pitcher_id','pitcher_name','inning','top_bottom','at_bat_number','pitch_number']
+              pdf=pd.read_parquet(tmp,columns=cols); tmp.unlink(missing_ok=True)
+              pdf['game_pk']=pd.to_numeric(pdf['game_pk'],errors='coerce').astype('Int64'); pdf=pdf[pdf['game_pk'].isin(pks)].copy()
+              pdf['pitcher_id']=pd.to_numeric(pdf['pitcher_id'],errors='coerce').astype('Int64'); pdf=pdf.dropna(subset=['pitcher_id']).copy(); pdf['pitcher_id']=pdf['pitcher_id'].astype('int64')
+              pdf['_ord']=pdf.groupby('game_pk').cumcount()+1
+              pbp=(pdf.groupby(['game_pk','pitcher_id'],as_index=False)
+                     .agg(pbp_pitches=('pitch_number','size'),entry_inning=('inning','min'),
+                          first_play_index=('at_bat_number','min'),last_play_index=('at_bat_number','max'),
+                          first_pitch_row=('_ord','min'),last_pitch_row=('_ord','max')))
+              first=(pdf.sort_values(['game_pk','_ord']).drop_duplicates(['game_pk','pitcher_id'])[['game_pk','pitcher_id','top_bottom']]
+                       .rename(columns={'top_bottom':'entry_half'}))
+              pbp=pbp.merge(first,on=['game_pk','pitcher_id'],how='left'); pbp['pbp_source']=pq_url; pbp['fallback_used']=False
+
+              box=[]; box_pitch_sum=0; team_fail=0
+              for gp in sorted(pks):
+                  feed=get_json(f'https://statsapi.mlb.com/api/v1.1/game/{gp}/feed/live')
+                  gdt=feed.get('gameData',{}).get('datetime',{}).get('dateTime') or meta[gp]['game_dt']
+                  for side in ('away','home'):
+                      oppside='home' if side=='away' else 'away'
+                      tm=feed['liveData']['boxscore']['teams'][side]
+                      team_abbr=feed.get('gameData',{}).get('teams',{}).get(side,{}).get('abbreviation')
+                      opp_abbr=feed.get('gameData',{}).get('teams',{}).get(oppside,{}).get('abbreviation')
+                      porder=tm.get('pitchers',[]); starter=porder[0] if porder else None
+                      sums=defaultdict(int)
+                      for pid in porder:
+                          pobj=tm.get('players',{}).get(f'ID{pid}',{}); st=pobj.get('stats',{}).get('pitching',{})
+                          np=st.get('numberOfPitches')
+                          if np is None: continue
+                          box_pitch_sum+=int(np)
+                          vals={'bf':int(st.get('battersFaced') or 0),'outs':ip_to_outs(st.get('inningsPitched')),
+                                'r':int(st.get('runs') or 0),'er':int(st.get('earnedRuns') or 0),'h':int(st.get('hits') or 0),
+                                'bb':int(st.get('baseOnBalls') or 0),'k':int(st.get('strikeOuts') or 0),'hr':int(st.get('homeRuns') or 0)}
+                          for k,v in vals.items(): sums[k]+=v
+                          allpos=[x.get('abbreviation') for x in (pobj.get('allPositions') or []) if x.get('abbreviation')]
+                          batting=pobj.get('battingOrder'); isstarter=(pid==starter)
+                          candidate=(not isstarter) and (batting is not None or any(x!='P' for x in allpos))
+                          primary='P'
+                          if candidate:
+                              if int(pid) not in person_cache:
+                                  pj=get_json(f'https://statsapi.mlb.com/api/v1/people/{int(pid)}')
+                                  person=(pj.get('people') or [{}])[0]; person_cache[int(pid)]=(person.get('primaryPosition') or {}).get('abbreviation') or ''
+                              primary=person_cache[int(pid)]
+                          pos_player=(not isstarter) and (any(x!='P' for x in allpos) or (batting is not None and primary!='P'))
+                          pclass='STARTER/OPENER/BULK' if isstarter else ('POSITION_PLAYER_PITCHING' if pos_player else 'BULLPEN_PITCHER')
+                          if pos_player:
+                              exclusions.append({'date':d.isoformat(),'game_pk':gp,'pitcher_id':int(pid),'pitcher_name':pobj.get('person',{}).get('fullName'),
+                                                 'team':team_abbr,'all_positions':'|'.join(allpos),'batting_order':batting,'primary_position':primary,
+                                                 'reason':'POSITION_PLAYER_PITCHING'})
+                          box.append({'date':d.isoformat(),'game_pk':gp,'game_date_time':gdt,'team':team_abbr,'opp':opp_abbr,
+                                      'home_away':'A' if side=='away' else 'H','pitcher_id':int(pid),'pitcher_name':pobj.get('person',{}).get('fullName'),
+                                      'is_starter':isstarter,'role':'STARTER' if isstarter else 'RELIEF_OR_BULK','pitcher_class':pclass,
+                                      'boxscore_np':int(np),**vals,'boxscore_source':f'https://statsapi.mlb.com/api/v1.1/game/{gp}/feed/live'})
+                      teamst=tm.get('teamStats',{}).get('pitching',{})
+                      chk={'bf':int(teamst.get('battersFaced') or 0),'outs':ip_to_outs(teamst.get('inningsPitched')),
+                           'r':int(teamst.get('runs') or 0),'h':int(teamst.get('hits') or 0),'bb':int(teamst.get('baseOnBalls') or 0),
+                           'k':int(teamst.get('strikeOuts') or 0),'hr':int(teamst.get('homeRuns') or 0)}
+                      ok=all(sums[k]==chk[k] for k in chk)
+                      if not ok: team_fail+=1
+                      teamqa.append({'date':d.isoformat(),'game_pk':gp,'team':team_abbr,'match_excluding_er':ok,
+                                     **{f'sum_{k}':sums[k] for k in chk},**{f'team_{k}':chk[k] for k in chk},
+                                     'sum_er':sums['er'],'team_er':int(teamst.get('earnedRuns') or 0)})
+              bdf=pd.DataFrame(box)
+              r0=pbp.merge(bdf[['game_pk','pitcher_id','boxscore_np']],on=['game_pk','pitcher_id'],how='outer',indicator=True)
+              r0['ok']=r0['_merge'].eq('both') & r0['pbp_pitches'].eq(r0['boxscore_np'])
+              badgps=sorted(set(r0.loc[~r0['ok'],'game_pk'].dropna().astype(int).tolist()))
+              if badgps:
+                  repl=[]
+                  for gp in badgps:
+                      repl.append(savant_game(gp)); time.sleep(.3)
+                  repl=pd.concat(repl,ignore_index=True) if repl else pd.DataFrame()
+                  pbp=pbp[~pbp['game_pk'].isin(badgps)].copy()
+                  pbp=pd.concat([pbp,repl],ignore_index=True,sort=False)
+              final=pbp.merge(bdf,on=['game_pk','pitcher_id'],how='outer',indicator=True)
+              final['pitch_count_match']=final['_merge'].eq('both') & final['pbp_pitches'].eq(final['boxscore_np'])
+              final['line_stats_match']=True
+              final['qa_status']=final.apply(lambda x:'EXCLUIR_POSITION_PLAYER_PITCHING' if x.get('pitcher_class')=='POSITION_PLAYER_PITCHING' else ('QA_VALIDATED_CANONICAL' if bool(x['pitch_count_match']) else 'QA_REVIEW'),axis=1)
+              all_final.extend(final.to_dict('records'))
+              mism=int((~final['pitch_count_match'].fillna(False)).sum())
+              pitch_rows=int(final.loc[final['_merge']=='both','pbp_pitches'].sum()) if len(final) else 0
+              status='PASS' if (len(set(pdf['game_pk'].astype(int)))==len(pks) and mism==0 and team_fail==0) else 'QA_REVIEW'
+              daily.append({'date':d.isoformat(),'games':len(pks),'pitch_rows':pitch_rows,'box_pitch_sum':box_pitch_sum,
+                            'pitch_delta':pitch_rows-box_pitch_sum,'mismatches':mism,'fallback_games':len(badgps),
+                            'fallback_game_pks':'|'.join(map(str,badgps)),'team_line_failures':team_fail,'status':status})
+
+          finaldf=pd.DataFrame(all_final)
+          both=finaldf[finaldf['_merge']=='both'].copy(); both['pitcher_id']=both['pitcher_id'].astype('int64'); both['game_pk']=both['game_pk'].astype('int64')
+          both['event_dt']=pd.to_datetime(both['game_date_time'],utc=True,errors='coerce'); both['event_date']=pd.to_datetime(both['date']).dt.date
+          both=both.sort_values(['event_dt','game_pk','pitcher_id']).reset_index(drop=True)
+          extra_by=defaultdict(list)
+          for x in EXTRA_LOADS:
+              extra_by[int(x['pitcher_id'])].append({**x,'event_date':date.fromisoformat(x['date']),'event_dt':pd.Timestamp(x['date']+'T12:00:00Z')})
+          hist=defaultdict(list); work=[]
+          for _,r in both.iterrows():
+              pid=int(r['pitcher_id']); cd=r['event_date']; cdt=r['event_dt']
+              prior=list(hist[pid])+[x for x in extra_by.get(pid,[]) if x['event_dt']<cdt]; prior=sorted(prior,key=lambda x:x['event_dt'])
+              prev=prior[-1] if prior else None
+              if prev:
+                  gap=(cd-prev['event_date']).days; same=(gap==0); rest=None if same else max(gap-1,0)
+              else: gap=None; same=False; rest=None
+              w2=[x for x in prior if 0 <= (cd-x['event_date']).days <=2]; w3=[x for x in prior if 0 <= (cd-x['event_date']).days <=3]
+              p2=sum(int(x['pitches']) for x in w2 if x.get('pitches') is not None); p3=sum(int(x['pitches']) for x in w3 if x.get('pitches') is not None)
+              bf2=None if any(x.get('bf') is None for x in w2) else sum(int(x['bf']) for x in w2)
+              bf3=None if any(x.get('bf') is None for x in w3) else sum(int(x['bf']) for x in w3)
+              dateset={x['event_date'] for x in prior}
+              rec={
+                'RELIEVER_APPEARANCE_ID':f"{int(r['game_pk'])}-{pid}",'GAME_PK':int(r['game_pk']),'FECHA':r['date'],'TEAM':r['team'],'OPP':r['opp'],'HOME_AWAY':r['home_away'],
+                'MLBAM_ID':pid,'PITCHER':r['pitcher_name'],'ROLE':r['role'],'DAYS_REST':rest,
+                'PREV_PITCHES':prev.get('pitches') if prev else None,'PREV_BF':prev.get('bf') if prev else None,'PREV_OUTS':prev.get('outs') if prev else None,
+                'PITCHES_2D':p2,'PITCHES_3D':p3,'BF_2D':bf2,'BF_3D':bf3,
+                'B2B':(cd-timedelta(days=1)) in dateset,'THREE_DAYS_3':((cd-timedelta(days=1)) in dateset and (cd-timedelta(days=2)) in dateset),
+                'CURRENT_PITCHES':int(r['pbp_pitches']),'CURRENT_BF':int(r['bf']),'CURRENT_OUTS':int(r['outs']),
+                'R':int(r['r']),'ER':int(r['er']),'H':int(r['h']),'BB':int(r['bb']),'K':int(r['k']),'HR':int(r['hr']),
+                'SOURCE_URL':r['pbp_source'],'QA_STATUS':r['qa_status'],'PREV_ROLE':prev.get('role') if prev else None,
+                'PREV_APPEARANCE_LEVEL':prev.get('level') if prev else None,'SAME_DAY_REPEAT':same,'PITCHER_CLASS':r['pitcher_class'],
+                'PBP_SOURCE':r['pbp_source'],'BOXSCORE_SOURCE':r['boxscore_source'],'PITCH_COUNT_MATCH':bool(r['pitch_count_match']),
+                'ENTRY_INNING':r.get('entry_inning'),'ENTRY_HALF':r.get('entry_half'),'FIRST_PLAY_INDEX':r.get('first_play_index'),'LAST_PLAY_INDEX':r.get('last_play_index')}
+              work.append(rec)
+              hist[pid].append({'event_date':cd,'event_dt':cdt,'game_pk':int(r['game_pk']),'pitches':int(r['pbp_pitches']),'bf':int(r['bf']),'outs':int(r['outs']),
+                                'role':r['role'],'level':'MLB'})
+          wdf=pd.DataFrame(work)
+          nst=wdf[wdf['ROLE']!='STARTER'].copy(); bull=nst[nst['PITCHER_CLASS']=='BULLPEN_PITCHER'].copy(); excl=nst[nst['PITCHER_CLASS']=='POSITION_PLAYER_PITCHING'].copy()
+          ddf=pd.DataFrame(daily)
+          finaldf.to_csv(OUT/'hbm26_canonical_all_recon.csv',index=False)
+          wdf.to_csv(OUT/'hbm26_canonical_workload_all_pitchers.csv',index=False)
+          nst.to_csv(OUT/'hbm26_canonical_nonstarters.csv',index=False)
+          bull.to_csv(OUT/'hbm26_canonical_bullpen.csv',index=False)
+          excl.to_csv(OUT/'hbm26_canonical_exclusions.csv',index=False)
+          ddf.to_csv(OUT/'hbm26_canonical_daily_qa.csv',index=False)
+          pd.DataFrame(teamqa).to_csv(OUT/'hbm26_canonical_team_qa.csv',index=False)
+          summary={'start':START.isoformat(),'end':END.isoformat(),'dates':len(ddf),'dates_pass':int((ddf.status.str.startswith('PASS')).sum()),
+                   'dates_review':int((~ddf.status.str.startswith('PASS')).sum()),'games':int(ddf.games.sum()),
+                   'pitch_rows':int(ddf.pitch_rows.sum()),'box_pitch_sum':int(ddf.box_pitch_sum.sum()),'pitch_delta':int(ddf.pitch_delta.sum()),
+                   'pitch_mismatches':int(ddf.mismatches.sum()),'fallback_games':int(ddf.fallback_games.sum()),'team_line_failures':int(ddf.team_line_failures.sum()),
+                   'all_pitcher_appearances':len(wdf),'nonstarters':len(nst),'bullpen_appearances':len(bull),'position_player_exclusions':len(excl),
+                   'extra_loads':EXTRA_LOADS}
+          (OUT/'hbm26_canonical_summary.json').write_text(json.dumps(summary,indent=2,default=str),encoding='utf-8')
+          print(json.dumps(summary,indent=2,default=str))
+          PY
+      - name: Commit canonical outputs
+        run: |
+          git config user.name 'hbm26-qa-bot'
+          git config user.email 'hbm26-qa-bot@users.noreply.github.com'
+          git add runtime/hbm26_canonical_*.csv runtime/hbm26_canonical_summary.json
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: canonical corrected backfill 0325-0410'; git push; fi
