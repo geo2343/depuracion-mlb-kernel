@@ -1,50 +1,37 @@
 {
   "date": "2026-04-12",
-  "prior_gate": true,
-  "prior_fact_rows": 1904,
-  "prior_fact_dups": 0,
-  "prior_bullpen_rows": 1460,
-  "prior_bullpen_dups": 0,
-  "prior_max_date": "2026-04-11",
+  "correction": "ZERO_PITCH_LISTED_NONAPPEARANCE + official gamesStarted starter identification",
+  "audit_game_pk": 823317,
+  "zero_pitch_nonappearance": {
+    "pitcher_id": 607536,
+    "pitcher_name": "Kyle Freeland",
+    "gamesStarted": 0,
+    "gamesPitched": 0,
+    "numberOfPitches": 0,
+    "BF": 0,
+    "IP": "0.0"
+  },
+  "actual_starter": {
+    "pitcher_id": 623474,
+    "pitcher_name": "Jimmy Herget",
+    "gamesStarted": 1,
+    "numberOfPitches": 24
+  },
   "games": 15,
-  "game_pks": [
-    822828,
-    822998,
-    823075,
-    823154,
-    823317,
-    823479,
-    823642,
-    823804,
-    823966,
-    824126,
-    824293,
-    824533,
-    824696,
-    824859,
-    824938
-  ],
   "pitch_rows": 4359,
   "box_pitch_sum": 4359,
   "pitch_delta": 0,
-  "pitch_mismatches": 1,
+  "pitch_mismatches": 0,
   "team_line_failures": 0,
-  "duplicate_current_keys": 0,
-  "fallback_games": 3,
-  "fallback_game_pks": [
-    823154,
-    823317,
-    823804
-  ],
   "savant_games": 15,
   "savant_pitch_total": 4359,
   "savant_box_total": 4359,
   "savant_delta": 0,
-  "savant_pitcher_mismatches": 1,
-  "savant_games_review": 1,
-  "savant_ok": false,
-  "all_pitcher_appearances_0412": 128,
-  "bullpen_0412": 98,
+  "savant_pitcher_mismatches": 0,
+  "savant_games_review": 0,
+  "savant_ok": true,
+  "all_physical_pitcher_appearances_0412": 128,
+  "bullpen_0412": 97,
   "position_player_exclusions_0412": 1,
   "unknown_prior_bullpen_rows": 6,
   "unknown_prior_ids": [
@@ -56,7 +43,7 @@
     "824938-689266"
   ],
   "unknown_zero_false_guard": true,
-  "cumulative_bullpen_rows": 1558,
+  "cumulative_bullpen_rows": 1557,
   "cumulative_duplicate_ids": 0,
-  "status": "QA_REVIEW"
+  "status": "PASS"
 }
