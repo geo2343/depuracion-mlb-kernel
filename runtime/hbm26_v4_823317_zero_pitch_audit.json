@@ -1,0 +1,440 @@
+{
+  "game_pk": 823317,
+  "officialDate": "2026-04-12",
+  "teams": {
+    "away": {
+      "team": "COL",
+      "pitchers": [
+        {
+          "order_index": 0,
+          "pitcher_id": 607536,
+          "name": "Kyle Freeland",
+          "numberOfPitches": 0,
+          "battersFaced": 0,
+          "inningsPitched": "0.0",
+          "gamesStarted": 0,
+          "gamesPitched": 0,
+          "note": {
+            "isCurrentBatter": false,
+            "isCurrentPitcher": false,
+            "isOnBench": false,
+            "isSubstitute": false
+          },
+          "primaryPosition": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          }
+        },
+        {
+          "order_index": 1,
+          "pitcher_id": 623474,
+          "name": "Jimmy Herget",
+          "numberOfPitches": 24,
+          "battersFaced": 6,
+          "inningsPitched": "1.0",
+          "gamesStarted": 1,
+          "gamesPitched": 1,
+          "note": {
+            "isCurrentBatter": false,
+            "isCurrentPitcher": false,
+            "isOnBench": false,
+            "isSubstitute": false
+          },
+          "primaryPosition": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          }
+        },
+        {
+          "order_index": 2,
+          "pitcher_id": 801403,
+          "name": "Chase Dollander",
+          "numberOfPitches": 10,
+          "battersFaced": 4,
+          "inningsPitched": "1.0",
+          "gamesStarted": 0,
+          "gamesPitched": 1,
+          "note": {
+            "isCurrentBatter": false,
+            "isCurrentPitcher": false,
+            "isOnBench": false,
+            "isSubstitute": false
+          },
+          "primaryPosition": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          }
+        },
+        {
+          "order_index": 3,
+          "pitcher_id": 678368,
+          "name": "Valente Bellozo",
+          "numberOfPitches": 90,
+          "battersFaced": 24,
+          "inningsPitched": "4.1",
+          "gamesStarted": 0,
+          "gamesPitched": 1,
+          "note": {
+            "isCurrentBatter": false,
+            "isCurrentPitcher": false,
+            "isOnBench": false,
+            "isSubstitute": false
+          },
+          "primaryPosition": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          }
+        },
+        {
+          "order_index": 4,
+          "pitcher_id": 657514,
+          "name": "Brennan Bernardino",
+          "numberOfPitches": 5,
+          "battersFaced": 1,
+          "inningsPitched": "0.2",
+          "gamesStarted": 0,
+          "gamesPitched": 1,
+          "note": {
+            "isCurrentBatter": false,
+            "isCurrentPitcher": false,
+            "isOnBench": false,
+            "isSubstitute": false
+          },
+          "primaryPosition": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          }
+        },
+        {
+          "order_index": 5,
+          "pitcher_id": 680767,
+          "name": "Victor Vodnik",
+          "numberOfPitches": 13,
+          "battersFaced": 3,
+          "inningsPitched": "1.0",
+          "gamesStarted": 0,
+          "gamesPitched": 1,
+          "note": {
+            "isCurrentBatter": false,
+            "isCurrentPitcher": false,
+            "isOnBench": false,
+            "isSubstitute": false
+          },
+          "primaryPosition": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          }
+        }
+      ]
+    },
+    "home": {
+      "team": "SD",
+      "pitchers": [
+        {
+          "order_index": 0,
+          "pitcher_id": 601713,
+          "name": "Nick Pivetta",
+          "numberOfPitches": 46,
+          "battersFaced": 9,
+          "inningsPitched": "3.0",
+          "gamesStarted": 1,
+          "gamesPitched": 1,
+          "note": {
+            "isCurrentBatter": false,
+            "isCurrentPitcher": false,
+            "isOnBench": false,
+            "isSubstitute": false
+          },
+          "primaryPosition": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          }
+        },
+        {
+          "order_index": 1,
+          "pitcher_id": 606996,
+          "name": "Kyle Hart",
+          "numberOfPitches": 34,
+          "battersFaced": 10,
+          "inningsPitched": "2.1",
+          "gamesStarted": 0,
+          "gamesPitched": 1,
+          "note": {
+            "isCurrentBatter": false,
+            "isCurrentPitcher": false,
+            "isOnBench": false,
+            "isSubstitute": false
+          },
+          "primaryPosition": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          }
+        },
+        {
+          "order_index": 2,
+          "pitcher_id": 688158,
+          "name": "David Morgan",
+          "numberOfPitches": 33,
+          "battersFaced": 6,
+          "inningsPitched": "1.2",
+          "gamesStarted": 0,
+          "gamesPitched": 1,
+          "note": {
+            "isCurrentBatter": false,
+            "isCurrentPitcher": false,
+            "isOnBench": false,
+            "isSubstitute": false
+          },
+          "primaryPosition": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          }
+        },
+        {
+          "order_index": 3,
+          "pitcher_id": 593974,
+          "name": "Wandy Peralta",
+          "numberOfPitches": 11,
+          "battersFaced": 3,
+          "inningsPitched": "1.0",
+          "gamesStarted": 0,
+          "gamesPitched": 1,
+          "note": {
+            "isCurrentBatter": false,
+            "isCurrentPitcher": false,
+            "isOnBench": false,
+            "isSubstitute": false
+          },
+          "primaryPosition": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          }
+        },
+        {
+          "order_index": 4,
+          "pitcher_id": 699134,
+          "name": "Bradgley Rodriguez",
+          "numberOfPitches": 19,
+          "battersFaced": 4,
+          "inningsPitched": "1.0",
+          "gamesStarted": 0,
+          "gamesPitched": 1,
+          "note": {
+            "isCurrentBatter": false,
+            "isCurrentPitcher": true,
+            "isOnBench": false,
+            "isSubstitute": false
+          },
+          "primaryPosition": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          }
+        }
+      ]
+    }
+  },
+  "first_physical_pitch_events": [
+    {
+      "atBatIndex": 0,
+      "inning": 1,
+      "halfInning": "top",
+      "matchup_pitcher_id": 601713,
+      "matchup_pitcher_name": "Nick Pivetta",
+      "event_index": 3,
+      "playId": "ed15eb15-42d1-3e9c-afb3-90915abed18c",
+      "isPitch": true,
+      "details_code": "B",
+      "description": "Ball",
+      "pitch_number": {
+        "balls": 1,
+        "strikes": 0,
+        "outs": 0
+      },
+      "has_pitchData": true
+    },
+    {
+      "atBatIndex": 3,
+      "inning": 1,
+      "halfInning": "bottom",
+      "matchup_pitcher_id": 623474,
+      "matchup_pitcher_name": "Jimmy Herget",
+      "event_index": 1,
+      "playId": "39141c5b-5703-3075-9ca9-a078fa9f59c7",
+      "isPitch": true,
+      "details_code": "C",
+      "description": "Called Strike",
+      "pitch_number": {
+        "balls": 0,
+        "strikes": 1,
+        "outs": 0
+      },
+      "has_pitchData": true
+    },
+    {
+      "atBatIndex": 12,
+      "inning": 2,
+      "halfInning": "bottom",
+      "matchup_pitcher_id": 801403,
+      "matchup_pitcher_name": "Chase Dollander",
+      "event_index": 1,
+      "playId": "76d32cf3-87ba-3bea-a373-0e1f66c6ad9a",
+      "isPitch": true,
+      "details_code": "S",
+      "description": "Swinging Strike",
+      "pitch_number": {
+        "balls": 0,
+        "strikes": 1,
+        "outs": 0
+      },
+      "has_pitchData": true
+    },
+    {
+      "atBatIndex": 19,
+      "inning": 3,
+      "halfInning": "bottom",
+      "matchup_pitcher_id": 678368,
+      "matchup_pitcher_name": "Valente Bellozo",
+      "event_index": 1,
+      "playId": "2515ab8a-4bfd-3648-8e29-43adc348508e",
+      "isPitch": true,
+      "details_code": "B",
+      "description": "Ball",
+      "pitch_number": {
+        "balls": 1,
+        "strikes": 0,
+        "outs": 0
+      },
+      "has_pitchData": true
+    },
+    {
+      "atBatIndex": 24,
+      "inning": 4,
+      "halfInning": "top",
+      "matchup_pitcher_id": 606996,
+      "matchup_pitcher_name": "Kyle Hart",
+      "event_index": 0,
+      "playId": "8ec04d87-2694-3cf0-89f9-9f8c4e5867ed",
+      "isPitch": true,
+      "details_code": "F",
+      "description": "Foul",
+      "pitch_number": {
+        "balls": 0,
+        "strikes": 1,
+        "outs": 0
+      },
+      "has_pitchData": true
+    },
+    {
+      "atBatIndex": 43,
+      "inning": 6,
+      "halfInning": "top",
+      "matchup_pitcher_id": 688158,
+      "matchup_pitcher_name": "David Morgan",
+      "event_index": 2,
+      "playId": "148738cf-abea-368e-b28e-c51854b7bc30",
+      "isPitch": true,
+      "details_code": "B",
+      "description": "Ball",
+      "pitch_number": {
+        "balls": 1,
+        "strikes": 0,
+        "outs": 1
+      },
+      "has_pitchData": true
+    },
+    {
+      "atBatIndex": 59,
+      "inning": 7,
+      "halfInning": "bottom",
+      "matchup_pitcher_id": 657514,
+      "matchup_pitcher_name": "Brennan Bernardino",
+      "event_index": 2,
+      "playId": "6b0e1f77-c7c3-376d-8f1c-fbe085197c13",
+      "isPitch": true,
+      "details_code": "S",
+      "description": "Swinging Strike",
+      "pitch_number": {
+        "balls": 0,
+        "strikes": 1,
+        "outs": 1
+      },
+      "has_pitchData": true
+    },
+    {
+      "atBatIndex": 60,
+      "inning": 8,
+      "halfInning": "top",
+      "matchup_pitcher_id": 593974,
+      "matchup_pitcher_name": "Wandy Peralta",
+      "event_index": 1,
+      "playId": "246e0644-2819-3075-bb16-0c4be90647c2",
+      "isPitch": true,
+      "details_code": "C",
+      "description": "Called Strike",
+      "pitch_number": {
+        "balls": 0,
+        "strikes": 1,
+        "outs": 0
+      },
+      "has_pitchData": true
+    },
+    {
+      "atBatIndex": 63,
+      "inning": 8,
+      "halfInning": "bottom",
+      "matchup_pitcher_id": 680767,
+      "matchup_pitcher_name": "Victor Vodnik",
+      "event_index": 3,
+      "playId": "8c62c0bf-3712-3ea0-9551-954f3759075b",
+      "isPitch": true,
+      "details_code": "B",
+      "description": "Ball",
+      "pitch_number": {
+        "balls": 1,
+        "strikes": 0,
+        "outs": 0
+      },
+      "has_pitchData": true
+    },
+    {
+      "atBatIndex": 66,
+      "inning": 9,
+      "halfInning": "top",
+      "matchup_pitcher_id": 699134,
+      "matchup_pitcher_name": "Bradgley Rodriguez",
+      "event_index": 1,
+      "playId": "5c505d32-8b36-35c8-892d-09dbcf1277c8",
+      "isPitch": true,
+      "details_code": "C",
+      "description": "Called Strike",
+      "pitch_number": {
+        "balls": 0,
+        "strikes": 1,
+        "outs": 0
+      },
+      "has_pitchData": true
+    }
+  ]
+}
