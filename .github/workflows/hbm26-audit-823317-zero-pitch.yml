@@ -1,0 +1,65 @@
+name: HBM26 Audit 823317 Zero Pitch Starter
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-audit-823317-zero-pitch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests
+      - name: Audit MLB feed
+        run: |
+          python - <<'PY'
+          import json, requests
+          from pathlib import Path
+          gp=823317
+          feed=requests.get(f'https://statsapi.mlb.com/api/v1.1/game/{gp}/feed/live',timeout=90).json()
+          gd=feed['gameData']; out={'game_pk':gp,'officialDate':gd.get('datetime',{}).get('officialDate'),'teams':{},'first_physical_pitch_events':[]}
+          for side in ('away','home'):
+              tm=feed['liveData']['boxscore']['teams'][side]
+              rows=[]
+              for idx,pid in enumerate(tm.get('pitchers',[])):
+                  pobj=tm.get('players',{}).get(f'ID{pid}',{}); st=pobj.get('stats',{}).get('pitching',{})
+                  rows.append({'order_index':idx,'pitcher_id':pid,'name':pobj.get('person',{}).get('fullName'),
+                               'numberOfPitches':st.get('numberOfPitches'),'battersFaced':st.get('battersFaced'),
+                               'inningsPitched':st.get('inningsPitched'),'gamesStarted':st.get('gamesStarted'),
+                               'gamesPitched':st.get('gamesPitched'),'note':pobj.get('gameStatus',{}),
+                               'primaryPosition':pobj.get('position',{})})
+              out['teams'][side]={'team':gd.get('teams',{}).get(side,{}).get('abbreviation'),'pitchers':rows}
+          # First real isPitch event for each pitching team, with play matchup and event fields.
+          seen=set()
+          for play in feed['liveData']['plays']['allPlays']:
+              matchup=play.get('matchup',{}); mp=(matchup.get('pitcher') or {}); mpid=mp.get('id')
+              half=play.get('about',{}).get('halfInning'); inning=play.get('about',{}).get('inning'); atbat=play.get('atBatIndex')
+              for ev in play.get('playEvents',[]):
+                  if not ev.get('isPitch'): continue
+                  details=ev.get('details',{}); pitch=ev.get('pitchData',{})
+                  rec={'atBatIndex':atbat,'inning':inning,'halfInning':half,'matchup_pitcher_id':mpid,
+                       'matchup_pitcher_name':mp.get('fullName'),'event_index':ev.get('index'),'playId':ev.get('playId'),
+                       'isPitch':ev.get('isPitch'),'details_code':details.get('code'),'description':details.get('description'),
+                       'pitch_number':ev.get('count',{}),'has_pitchData':bool(pitch)}
+                  key=(half,mpid)
+                  if key not in seen:
+                      out['first_physical_pitch_events'].append(rec); seen.add(key)
+                  break
+          Path('runtime/hbm26_v4_823317_zero_pitch_audit.json').write_text(json.dumps(out,indent=2,default=str),encoding='utf-8')
+          print(json.dumps(out,indent=2,default=str))
+          PY
+      - name: Commit audit
+        run: |
+          git config user.name 'hbm26-qa-bot'
+          git config user.email 'hbm26-qa-bot@users.noreply.github.com'
+          git add runtime/hbm26_v4_823317_zero_pitch_audit.json
+          git commit -m 'HBM-26: audit GAME_PK 823317 zero-pitch starter' || true
+          git push || true
