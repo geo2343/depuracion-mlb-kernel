@@ -1,0 +1,71 @@
+name: HBM26 V3 0411 Savant Control
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-v3-0411-savant-control.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  control:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas requests
+      - name: Independent Savant pitch control
+        run: |
+          python - <<'PY'
+          import io, json, time
+          from pathlib import Path
+          import pandas as pd
+          import requests
+
+          DATE='2026-04-11'; OUT=Path('runtime')
+          recon=pd.read_csv(OUT/'hbm26_v3_all_recon.csv')
+          x=recon[(recon['date']==DATE) & (recon['_merge']=='both')].copy()
+          x['game_pk']=x['game_pk'].astype(int); x['pitcher_id']=x['pitcher_id'].astype(int)
+          games=sorted(x['game_pk'].unique().tolist())
+          S=requests.Session(); S.headers.update({'User-Agent':'HBM-26-Savant-Control/1.0'})
+          rows=[]; detail=[]
+          for gp in games:
+              url=f'https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk={gp}'
+              r=S.get(url,timeout=120); r.raise_for_status(); df=pd.read_csv(io.StringIO(r.text))
+              if 'game_pk' in df.columns:
+                  df=df[pd.to_numeric(df['game_pk'],errors='coerce')==gp].copy()
+              desc=df['description'].fillna('').astype(str).str.lower() if 'description' in df.columns else pd.Series('',index=df.index)
+              df=df[~desc.str.startswith('automatic_')].copy()
+              df['pitcher_id']=pd.to_numeric(df['pitcher'],errors='coerce').astype('Int64')
+              df=df.dropna(subset=['pitcher_id']).copy(); df['pitcher_id']=df['pitcher_id'].astype(int)
+              sg=df.groupby('pitcher_id').size().rename('savant_pitches').reset_index()
+              bx=x[x.game_pk==gp][['pitcher_id','boxscore_np']].copy(); bx['boxscore_np']=bx['boxscore_np'].astype(int)
+              z=bx.merge(sg,on='pitcher_id',how='outer',indicator=True)
+              z['match']=z['_merge'].eq('both') & z['boxscore_np'].eq(z['savant_pitches'])
+              mism=int((~z['match']).sum()); sav_total=int(sg['savant_pitches'].sum()); box_total=int(bx['boxscore_np'].sum())
+              rows.append({'date':DATE,'game_pk':gp,'savant_pitches':sav_total,'boxscore_pitches':box_total,'delta':sav_total-box_total,
+                           'pitcher_mismatches':mism,'status':'PASS' if mism==0 and sav_total==box_total else 'QA_REVIEW','source':url})
+              z.insert(0,'game_pk',gp); detail.append(z)
+              time.sleep(.15)
+          out=pd.DataFrame(rows); det=pd.concat(detail,ignore_index=True)
+          out.to_csv(OUT/'hbm26_v3_0411_savant_control.csv',index=False)
+          det.to_csv(OUT/'hbm26_v3_0411_savant_pitcher_control.csv',index=False)
+          summary={'date':DATE,'games_expected':15,'games_checked':len(out),'savant_pitch_total':int(out.savant_pitches.sum()),
+                   'boxscore_pitch_total':int(out.boxscore_pitches.sum()),'delta':int(out.delta.sum()),
+                   'pitcher_mismatches':int(out.pitcher_mismatches.sum()),'games_review':int((out.status!='PASS').sum()),
+                   'status':'PASS' if len(out)==15 and int(out.delta.sum())==0 and int(out.pitcher_mismatches.sum())==0 and int((out.status!='PASS').sum())==0 else 'QA_REVIEW'}
+          (OUT/'hbm26_v3_0411_savant_summary.json').write_text(json.dumps(summary,indent=2),encoding='utf-8')
+          print(json.dumps(summary,indent=2))
+          if summary['status']!='PASS': raise SystemExit('Independent Savant control failed')
+          PY
+      - name: Commit control outputs
+        if: always()
+        run: |
+          git config user.name 'hbm26-qa-bot'
+          git config user.email 'hbm26-qa-bot@users.noreply.github.com'
+          git add runtime/hbm26_v3_0411_savant_*.csv runtime/hbm26_v3_0411_savant_summary.json || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: Savant control 2026-04-11'; git push; fi
