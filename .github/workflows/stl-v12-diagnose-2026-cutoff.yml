@@ -1,0 +1,58 @@
+name: STL V1.2 Diagnose 2026 Cutoff
+
+on:
+  push:
+    paths:
+      - '.github/workflows/stl-v12-diagnose-2026-cutoff.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests pandas
+      - name: Diagnose 103 vs 101
+        run: |
+          python - <<'PY'
+          import requests, pandas as pd, json
+          from pathlib import Path
+          S=requests.Session(); S.headers.update({'User-Agent':'STL-cutoff-diagnostic/1.0'})
+          p={'sportId':1,'teamId':138,'gameTypes':'R','startDate':'2026-03-01','endDate':'2026-07-22','hydrate':'team,linescore'}
+          j=S.get('https://statsapi.mlb.com/api/v1/schedule',params=p,timeout=90).json()
+          vals=[]
+          for d in j.get('dates',[]):
+            for g in d.get('games',[]):
+              if g.get('status',{}).get('abstractGameState')!='Final' or g.get('gameType')!='R': continue
+              h=g['teams']['home']; a=g['teams']['away']
+              home=h['team']['id']==138
+              side=h if home else a; opp=a if home else h
+              vals.append({
+                'scheduleDate':d.get('date'),'officialDate':g.get('officialDate'),'gameDate':g.get('gameDate'),
+                'gamePk':g.get('gamePk'),'gameType':g.get('gameType'),'status':g.get('status',{}).get('detailedState'),
+                'seriesDescription':g.get('seriesDescription'),'isHome':home,'opponent':opp['team'].get('name'),
+                'stlScore':side.get('score'),'oppScore':opp.get('score'),'doubleHeader':g.get('doubleHeader'),'gameNumber':g.get('gameNumber'),
+                'rescheduledFromDate':g.get('rescheduledFromDate'),'rescheduledGameDate':g.get('rescheduledGameDate')
+              })
+          df=pd.DataFrame(vals).drop_duplicates('gamePk').sort_values(['officialDate','gameDate','gamePk']).reset_index(drop=True)
+          df.insert(0,'ordinal',range(1,len(df)+1))
+          Path('runtime/stl_v12').mkdir(parents=True,exist_ok=True)
+          df.to_csv('runtime/stl_v12/stl_2026_cutoff_schedule_diagnostic.csv',index=False)
+          print('COUNT',len(df))
+          print(df.tail(15).to_string(index=False))
+          print('DATES July20-22')
+          print(df[df.officialDate>='2026-07-20'].to_string(index=False))
+          PY
+      - name: Commit diagnostic
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/stl_v12/stl_2026_cutoff_schedule_diagnostic.csv
+          git commit -m 'STL V1.2: add 2026 cutoff schedule diagnostic' || true
+          git push || true
