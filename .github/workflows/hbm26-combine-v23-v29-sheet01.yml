@@ -1,0 +1,64 @@
+name: HBM26 Combine V23-V29 Sheet01
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-combine-v23-v29-sheet01.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Combine certified rows
+        run: |
+          python - <<'PY'
+          import csv
+          from pathlib import Path
+
+          files = [
+              'runtime/hbm26_v23_sheet01_0501.csv',
+              'runtime/hbm26_v24_sheet01_0502.csv',
+              'runtime/hbm26_v25_sheet01_0503.csv',
+              'runtime/hbm26_v26_sheet01_0504.csv',
+              'runtime/hbm26_v27_sheet01_0505.csv',
+              'runtime/hbm26_v28_sheet01_0506.csv',
+              'runtime/hbm26_v29_sheet01_0507.csv',
+          ]
+          expected = [96,90,96,77,76,94,70]
+          out = Path('runtime/hbm26_v23_v29_sheet01_0501_0507_noheader.csv')
+          total = 0
+          with out.open('w', encoding='utf-8', newline='') as fo:
+              w = csv.writer(fo)
+              for p, exp in zip(files, expected):
+                  with open(p, encoding='utf-8', newline='') as fi:
+                      r = csv.reader(fi)
+                      header = next(r)
+                      if len(header) != 40:
+                          raise SystemExit(f'Bad header width {p}: {len(header)}')
+                      rows = list(r)
+                      if len(rows) != exp:
+                          raise SystemExit(f'Bad row count {p}: {len(rows)} != {exp}')
+                      for row in rows:
+                          if len(row) != 40:
+                              raise SystemExit(f'Bad row width {p}: {len(row)}')
+                          w.writerow(row)
+                      total += len(rows)
+          if total != 599:
+              raise SystemExit(f'Combined row count {total} != 599')
+          print('COMBINED_ROWS=599')
+          PY
+      - name: Commit combined CSV
+        run: |
+          git config user.name 'hbm26-qa-bot'
+          git config user.email 'hbm26-qa-bot@users.noreply.github.com'
+          git add runtime/hbm26_v23_v29_sheet01_0501_0507_noheader.csv
+          git commit -m 'HBM-26: combine certified 2026-05-01 through 2026-05-07 rows'
+          git push
