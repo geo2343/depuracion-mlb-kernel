@@ -31,6 +31,18 @@ jobs:
           start = src.index(start_marker) + len(start_marker)
           end = src.index(end_marker, start)
           template = dedent(src[start:end])
+          template = template.replace(
+              "    r=S.get(u,timeout=120); r.raise_for_status(); df=pd.read_csv(io.StringIO(r.text))",
+              "    last=None\n"
+              "    for _i in range(8):\n"
+              "        try:\n"
+              "            r=S.get(u,timeout=120); r.raise_for_status(); break\n"
+              "        except Exception as e:\n"
+              "            last=e; time.sleep(2.0*(_i+1))\n"
+              "    else:\n"
+              "        raise last\n"
+              "    df=pd.read_csv(io.StringIO(r.text))"
+          )
 
           jobs = [
               (17, '2026-04-25', '2026-04-24', '0425', 16, '0424'),
