@@ -1,0 +1,58 @@
+name: HBM26 V10 Incremental 0418
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-v10-0418-incremental.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas pyarrow requests
+      - name: Derive and run V10 for 2026-04-18
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+
+          src = Path('.github/workflows/hbm26-v5-0413-incremental.yml').read_text(encoding='utf-8')
+          start_marker = "          python - <<'PY'\n"
+          end_marker = "\n          PY\n"
+          start = src.index(start_marker) + len(start_marker)
+          end = src.index(end_marker, start)
+          code = dedent(src[start:end])
+
+          code = code.replace("OUT/'hbm26_v4_all_recon.csv'", "OUT/'__PARENT_ALL_RECON__.csv'")
+          code = code.replace("OUT/'hbm26_v4_bullpen.csv'", "OUT/'__PARENT_BULLPEN__.csv'")
+          code = code.replace('TARGET=date(2026,4,13); PRIOR_END=date(2026,4,12)',
+                              'TARGET=date(2026,4,18); PRIOR_END=date(2026,4,17)')
+          code = code.replace('HBM-26-V5-0413/1.0', 'HBM-26-V10-0418/1.0')
+          code = code.replace('prior_bull_rows==1557', 'prior_bull_rows==1965')
+          code = code.replace('Parent V4 gate failed', 'Parent V9 gate failed')
+          code = code.replace('hbm26_v5', 'hbm26_v10')
+          code = code.replace('0413', '0418')
+          code = code.replace('QA_VALIDATED_CANONICAL_V5', 'QA_VALIDATED_CANONICAL_V10')
+          code = code.replace('QA_VALIDATED_PBP_V5', 'QA_VALIDATED_PBP_V10')
+          code = code.replace('V5 2026-04-13 QA failed', 'V10 2026-04-18 QA failed')
+          code = code.replace("OUT/'__PARENT_ALL_RECON__.csv'", "OUT/'hbm26_v9_all_recon.csv'")
+          code = code.replace("OUT/'__PARENT_BULLPEN__.csv'", "OUT/'hbm26_v9_bullpen.csv'")
+
+          compile(code, 'hbm26_v10_0418_derived.py', 'exec')
+          exec(compile(code, 'hbm26_v10_0418_derived.py', 'exec'), {'__name__': '__main__'})
+          PY
+      - name: Commit V10 outputs
+        if: always()
+        run: |
+          git config user.name 'hbm26-qa-bot'
+          git config user.email 'hbm26-qa-bot@users.noreply.github.com'
+          git add runtime/hbm26_v10_*.csv runtime/hbm26_v10_0418_summary.json || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: validated increment 2026-04-18'; git push; fi
