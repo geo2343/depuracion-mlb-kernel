@@ -1,0 +1,57 @@
+name: SEA V3.3 Close Three Matrices
+
+on:
+  push:
+    paths:
+      - '.github/workflows/sea-v33-close-three-matrices.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  reconstruct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests pandas numpy tabulate
+      - name: Derive and run Seattle reconstruction from validated STL kernel
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+          src=Path('.github/workflows/stl-v12-final-reconstruction-gamelog.yml').read_text(encoding='utf-8')
+          marker="          python - <<'PY'\n"
+          start=src.index(marker)+len(marker)
+          end=src.index("\n          PY",start)
+          code=dedent(src[start:end])
+          replacements=[
+            ("OUT=Path('runtime/stl_v12_final')", "OUT=Path('runtime/sea_v33_final')"),
+            ('TEAM_ID=138','TEAM_ID=136'),
+            ("'2024':('2024-03-28','2024-09-29',162,672),", "'2024':('2024-03-28','2024-09-29',162,676),"),
+            ("'2025':('2025-03-27','2025-09-28',162,689),", "'2025':('2025-03-27','2025-09-28',162,766),"),
+            ("'2026_CUTOFF':('2026-03-26','2026-07-22',101,448),", "'2026_CUTOFF':('2026-03-26','2026-07-21',102,412),"),
+            ('425','426'),
+            ('1809','1854'),
+            ('stl_','sea_'),
+            ('STL_','SEA_'),
+            ('STL-V1.2-final','SEA-V3.3-final'),
+            ('STL V1.2','SEA V3.3'),
+            ('V1.2','V3.3'),
+            ('V12','V33'),
+          ]
+          for a,b in replacements:
+            code=code.replace(a,b)
+          compile(code,'sea_v33_final.py','exec')
+          exec(compile(code,'sea_v33_final.py','exec'),{'__name__':'__main__'})
+          PY
+      - name: Commit Seattle outputs
+        if: always()
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/sea_v33_final || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'SEA V3.3: close opponent-strength, inning-distribution and starter-bullpen matrices'; git push; fi
