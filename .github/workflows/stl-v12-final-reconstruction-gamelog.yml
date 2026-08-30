@@ -1,0 +1,187 @@
+name: STL V1.2 Final Reconstruction GameLog
+
+on:
+  push:
+    paths:
+      - '.github/workflows/stl-v12-final-reconstruction-gamelog.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  reconstruct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests pandas numpy tabulate
+      - name: Reconstruct 425 played games from MLB gameLog
+        run: |
+          python - <<'PY'
+          import json,time,threading
+          from pathlib import Path
+          from concurrent.futures import ThreadPoolExecutor,as_completed
+          import requests,pandas as pd,numpy as np
+
+          OUT=Path('runtime/stl_v12_final'); OUT.mkdir(parents=True,exist_ok=True)
+          TEAM_ID=138
+          periods={
+            '2024':('2024-03-28','2024-09-29',162,672),
+            '2025':('2025-03-27','2025-09-28',162,689),
+            '2026_CUTOFF':('2026-03-26','2026-07-22',101,448),
+          }
+          headers={'User-Agent':'Mozilla/5.0 STL-V1.2-final/1.0'}
+          def getj(url,params=None,tries=7):
+            last=None
+            for i in range(tries):
+              try:
+                r=requests.get(url,params=params,headers=headers,timeout=90); r.raise_for_status(); return r.json()
+              except Exception as e:
+                last=e; time.sleep(1.0*(i+1))
+            raise last
+
+          teamsj=getj('https://statsapi.mlb.com/api/v1/teams',{'sportId':1,'hydrate':'division'})
+          team_meta={t['id']:{'name':t['name'],'abbr':t.get('abbreviation',t['name'])} for t in teamsj['teams']}
+          def norm_abbr(x):
+            x=(x or '').upper().strip()
+            return {'CHW':'CWS','WSN':'WSH','KCR':'KC','SDP':'SD','SFG':'SF','TBR':'TB','OAK':'ATH','AZ':'ARI','ANA':'LAA','FLA':'MIA'}.get(x,x)
+
+          def gamelog(year,end):
+            j=getj(f'https://statsapi.mlb.com/api/v1/teams/{TEAM_ID}/stats',{'stats':'gameLog','group':'hitting','season':year,'gameType':'R'})
+            sp=j.get('stats',[{}])[0].get('splits',[])
+            rows=[]
+            for s in sp:
+              dt=s.get('date'); pk=(s.get('game') or {}).get('gamePk')
+              if not dt or not pk or dt>end: continue
+              rows.append({'DATE':dt,'GAME_PK':int(pk),'RS_GAMELOG':int((s.get('stat') or {}).get('runs',0))})
+            return pd.DataFrame(rows).drop_duplicates('GAME_PK').sort_values(['DATE','GAME_PK']).reset_index(drop=True)
+
+          universes=[]
+          for label,(start,end,eg,ers) in periods.items():
+            y=int(label[:4]); df=gamelog(y,end)
+            if len(df)!=eg: raise RuntimeError(f'{label}: gameLog count {len(df)} != {eg}')
+            if int(df.RS_GAMELOG.sum())!=ers: raise RuntimeError(f'{label}: gameLog runs {int(df.RS_GAMELOG.sum())} != {ers}')
+            df['PERIOD']=label; universes.append(df)
+          universe=pd.concat(universes,ignore_index=True)
+          if len(universe)!=425 or universe.GAME_PK.nunique()!=425: raise RuntimeError('425-game universe uniqueness failed')
+          universe.to_csv(OUT/'stl_425_gamelog_universe.csv',index=False)
+
+          # Fetch live feeds once, concurrently.
+          feeds={}
+          def fetch_feed(pk): return pk,getj(f'https://statsapi.mlb.com/api/v1.1/game/{int(pk)}/feed/live')
+          with ThreadPoolExecutor(max_workers=14) as ex:
+            futs=[ex.submit(fetch_feed,pk) for pk in universe.GAME_PK.tolist()]
+            for i,f in enumerate(as_completed(futs),1):
+              pk,j=f.result(); feeds[int(pk)]=j
+              if i%50==0: print('feeds',i,'/425')
+          if len(feeds)!=425: raise RuntimeError(f'feed count {len(feeds)} != 425')
+
+          # FanGraphs exact-window team prevention rankings + MLB RA/G.
+          def fg_team_pitching(year,start,end):
+            p={'age':'','pos':'all','stats':'pit','lg':'all','qual':'0','season':str(year),'season1':str(year),'startdate':start,'enddate':end,'month':'1000','hand':'','team':'0,ts','pageitems':'100','pagenum':'1','ind':'0','rost':'0','players':'','type':'8','postseason':'','sortdir':'default','sortstat':'WAR'}
+            j=getj('https://www.fangraphs.com/api/leaders/major-league/data',p); df=pd.DataFrame(j.get('data',[]))
+            def fc(cands):
+              for c in cands:
+                if c in df.columns:return c
+              raise KeyError((cands,list(df.columns)))
+            z=df[[fc(['TeamNameAbb','Team','TeamName']),fc(['ERA-','ERA_minus','ERAminus']),fc(['FIP-','FIP_minus','FIPminus'])]].copy()
+            z.columns=['FG_TEAM','ERA_MINUS','FIP_MINUS']; z['ABBR']=z.FG_TEAM.astype(str).map(norm_abbr)
+            z['ERA_MINUS']=pd.to_numeric(z.ERA_MINUS,errors='coerce'); z['FIP_MINUS']=pd.to_numeric(z.FIP_MINUS,errors='coerce')
+            return z.dropna(subset=['ERA_MINUS','FIP_MINUS'])
+          def league_ra(start,end):
+            j=getj('https://statsapi.mlb.com/api/v1/schedule',{'sportId':1,'gameTypes':'R','startDate':start,'endDate':end,'hydrate':'team'})
+            agg={}
+            for d in j.get('dates',[]):
+              for g in d.get('games',[]):
+                if g.get('gameType')!='R': continue
+                a=g.get('teams',{}).get('away',{}); h=g.get('teams',{}).get('home',{})
+                if a.get('score') is None or h.get('score') is None: continue
+                aid=a['team']['id']; hid=h['team']['id']; ar=int(a['score']); hr=int(h['score'])
+                for tid,ra in [(aid,hr),(hid,ar)]:
+                  x=agg.setdefault(tid,[0,0]); x[0]+=1;x[1]+=ra
+            rows=[]
+            for tid,(gg,ra) in agg.items():
+              if tid in team_meta and gg: rows.append({'TEAM_ID':tid,'ABBR':norm_abbr(team_meta[tid]['abbr']),'G':gg,'RA':ra,'RA_G':ra/gg})
+            return pd.DataFrame(rows)
+          rankings={}
+          for label,(start,end,eg,ers) in periods.items():
+            fg=fg_team_pitching(int(label[:4]),start,end); ra=league_ra(start,end); rk=ra.merge(fg,on='ABBR',how='inner')
+            if len(rk)!=30: raise RuntimeError(f'{label}: prevention ranking merge {len(rk)} !=30')
+            for c,src in [('RANK_RA_G','RA_G'),('RANK_ERA_MINUS','ERA_MINUS'),('RANK_FIP_MINUS','FIP_MINUS')]:rk[c]=rk[src].rank(method='average',ascending=True)
+            rk['COMPOSITE_RANK_SCORE']=rk[['RANK_RA_G','RANK_ERA_MINUS','RANK_FIP_MINUS']].mean(axis=1)
+            rk=rk.sort_values(['COMPOSITE_RANK_SCORE','RA_G','ERA_MINUS','FIP_MINUS']).reset_index(drop=True);rk['PREVENTION_RANK']=np.arange(1,31)
+            rk['OPP_STRENGTH']=np.where(rk.PREVENTION_RANK<=10,'FUERTE',np.where(rk.PREVENTION_RANK<=20,'MEDIO','DEBIL'))
+            rk.to_csv(OUT/f'opponent_prevention_rank_{label}.csv',index=False); rankings[label]={int(r.TEAM_ID):r.OPP_STRENGTH for r in rk.itertuples()}
+
+          rows=[]; scoring_trace=[]
+          for r in universe.itertuples(index=False):
+            pk=int(r.GAME_PK); j=feeds[pk]; gd=j['gameData']; ld=j['liveData']; homeid=int(gd['teams']['home']['id']); awayid=int(gd['teams']['away']['id'])
+            ishome=homeid==TEAM_ID; side='home' if ishome else 'away'; oppside='away' if ishome else 'home'; oppid=awayid if ishome else homeid
+            ls=ld['linescore']; rs=int((ls.get('teams',{}).get(side,{}) or {}).get('runs',r.RS_GAMELOG) or 0)
+            if rs!=int(r.RS_GAMELOG): raise RuntimeError(f'{pk}: linescore runs {rs} != gameLog {r.RS_GAMELOG}')
+            inns=[]
+            for inn in ls.get('innings',[]):
+              rr=(inn.get(side,{}) or {}).get('runs')
+              if rr is not None: inns.append((int(inn.get('num',len(inns)+1)),int(rr)))
+            oppbox=ld['boxscore']['teams'][oppside]; plist=[int(x) for x in oppbox.get('pitchers',[])]
+            starters=[]
+            for key,p in oppbox.get('players',{}).items():
+              pst=(p.get('stats',{}).get('pitching') or {})
+              if int(pst.get('gamesStarted',0) or 0)==1: starters.append(int((p.get('person') or {}).get('id',key.replace('ID',''))))
+            starter=starters[0] if len(starters)==1 else (plist[0] if plist else None)
+            if starter is None: raise RuntimeError(f'{pk}: no opponent starter')
+            sr=br=ur=missing_resp=0
+            half='bottom' if ishome else 'top'
+            for p in ld['plays']['allPlays']:
+              if p.get('about',{}).get('halfInning')!=half: continue
+              for rn in p.get('runners',[]):
+                if rn.get('movement',{}).get('end')!='score': continue
+                det=rn.get('details',{}); rp=det.get('responsiblePitcher'); rpid=rp.get('id') if isinstance(rp,dict) else None
+                if rpid is None:
+                  missing_resp+=1; ur+=1; cls='UNRESOLVED'
+                elif int(rpid)==starter: sr+=1;cls='STARTER'
+                elif int(rpid) in set(plist): br+=1;cls='BULLPEN'
+                else: ur+=1;cls='UNRESOLVED'
+                scoring_trace.append({'PERIOD':r.PERIOD,'DATE':r.DATE,'GAME_PK':pk,'RUNNER_ID':(det.get('runner') or {}).get('id'),'RESPONSIBLE_PITCHER_ID':rpid,'STARTER_ID':starter,'CLASS':cls,'INNING':p.get('about',{}).get('inning')})
+            if sr+br+ur!=rs: raise RuntimeError(f'{pk}: attributed {sr+br+ur} != RS {rs}')
+            rows.append({'PERIOD':r.PERIOD,'DATE':r.DATE,'GAME_PK':pk,'IS_HOME':ishome,'OPP_ID':oppid,'OPP':team_meta[oppid]['name'],'OPP_STRENGTH':rankings[r.PERIOD][oppid],'RS':rs,
+                         'R_1_3':sum(x for n,x in inns if n<=3),'R_4_6':sum(x for n,x in inns if 4<=n<=6),'R_7_PLUS':sum(x for n,x in inns if n>=7),'OFF_HALF_INNINGS':len(inns),'HALF_INNINGS_3PLUS':sum(x>=3 for n,x in inns),'GAME_HAS_3PLUS':int(any(x>=3 for n,x in inns)),
+                         'STARTER_ID':starter,'STARTER_RUNS':sr,'BULLPEN_RUNS':br,'UNRESOLVED_RUNS':ur,'MISSING_RESPONSIBLE_PITCHER':missing_resp})
+          games=pd.DataFrame(rows); trace=pd.DataFrame(scoring_trace)
+          games.to_csv(OUT/'stl_425_game_reconstruction.csv',index=False); trace.to_csv(OUT/'stl_1809_run_responsibility_trace.csv',index=False)
+          if len(games)!=425 or games.RS.sum()!=1809: raise RuntimeError(f'final universe/runs {len(games)}/{games.RS.sum()}')
+          if games.UNRESOLVED_RUNS.sum()!=0 or games.MISSING_RESPONSIBLE_PITCHER.sum()!=0: raise RuntimeError(f'unresolved={games.UNRESOLVED_RUNS.sum()}, missing responsible={games.MISSING_RESPONSIBLE_PITCHER.sum()}')
+          if len(trace)!=1809: raise RuntimeError(f'run trace {len(trace)} !=1809')
+
+          def pct(v):return round(100*float(v),1)
+          agg=[]
+          for (period,strength),d in games.groupby(['PERIOD','OPP_STRENGTH']):
+            n=len(d);hi=int(d.HALF_INNINGS_3PLUS.sum());tot=int(d.OFF_HALF_INNINGS.sum())
+            agg.append({'PERIOD':period,'OPP_STRENGTH':strength,'G':n,'RS':int(d.RS.sum()),'R_G':round(float(d.RS.mean()),3),'MEDIAN_RS':float(d.RS.median()),'SD_POP_RS':round(float(d.RS.std(ddof=0)),3),
+                        'PCT_0_2':pct((d.RS<=2).mean()),'PCT_3_4':pct(((d.RS>=3)&(d.RS<=4)).mean()),'PCT_5_PLUS':pct((d.RS>=5).mean()),'PCT_7_PLUS':pct((d.RS>=7).mean()),
+                        'R_G_HOME':round(float(d.loc[d.IS_HOME,'RS'].mean()),3) if d.IS_HOME.any() else None,'R_G_AWAY':round(float(d.loc[~d.IS_HOME,'RS'].mean()),3) if (~d.IS_HOME).any() else None,
+                        'R_1_3_G':round(float(d.R_1_3.mean()),3),'R_4_6_G':round(float(d.R_4_6.mean()),3),'R_7_PLUS_G':round(float(d.R_7_PLUS.mean()),3),
+                        'STARTER_RUNS':int(d.STARTER_RUNS.sum()),'STARTER_RUNS_G':round(float(d.STARTER_RUNS.mean()),3),'BULLPEN_RUNS':int(d.BULLPEN_RUNS.sum()),'BULLPEN_RUNS_G':round(float(d.BULLPEN_RUNS.mean()),3),
+                        'OFF_HALF_INNINGS':tot,'HALF_INNINGS_3PLUS':hi,'HALF_INNINGS_3PLUS_PCT':pct(hi/tot),'GAMES_WITH_3PLUS':int(d.GAME_HAS_3PLUS.sum()),'GAMES_WITH_3PLUS_PCT':pct(d.GAME_HAS_3PLUS.mean()),'SAMPLE_STATUS':'MUESTRA_INESTABLE' if n<10 else 'ESTABLE'})
+          agg=pd.DataFrame(agg).sort_values(['PERIOD','OPP_STRENGTH']);agg.to_csv(OUT/'stl_strength_scoring_summary.csv',index=False)
+          per=[]
+          for period,d in games.groupby('PERIOD'):
+            hi=int(d.HALF_INNINGS_3PLUS.sum());tot=int(d.OFF_HALF_INNINGS.sum())
+            per.append({'PERIOD':period,'G':len(d),'RS':int(d.RS.sum()),'OFF_HALF_INNINGS':tot,'HALF_INNINGS_3PLUS':hi,'HALF_INNINGS_3PLUS_PCT':pct(hi/tot),'GAMES_WITH_3PLUS':int(d.GAME_HAS_3PLUS.sum()),'GAMES_WITH_3PLUS_PCT':pct(d.GAME_HAS_3PLUS.mean()),'STARTER_RUNS':int(d.STARTER_RUNS.sum()),'STARTER_RUNS_G':round(float(d.STARTER_RUNS.mean()),3),'BULLPEN_RUNS':int(d.BULLPEN_RUNS.sum()),'BULLPEN_RUNS_G':round(float(d.BULLPEN_RUNS.mean()),3)})
+          per=pd.DataFrame(per).sort_values('PERIOD');per.to_csv(OUT/'stl_period_reconstruction_summary.csv',index=False)
+          qa={'game_counts':games.groupby('PERIOD').size().to_dict(),'rs_sums':games.groupby('PERIOD').RS.sum().astype(int).to_dict(),'total_games':len(games),'total_runs':int(games.RS.sum()),'run_trace_rows':len(trace),'unresolved_runs':int(games.UNRESOLVED_RUNS.sum()),'missing_responsible_pitcher':int(games.MISSING_RESPONSIBLE_PITCHER.sum()),'status':'PASS'}
+          (OUT/'qa.json').write_text(json.dumps(qa,indent=2),encoding='utf-8')
+          md=['# V1.2 — CIERRE DE BLOQUES RECONSTRUIDOS','',f"QA: **{qa['status']}** — 425 juegos, 1,809 carreras, 1,809 trazas de carrera, 0 carreras sin pitcher responsable.",'','## Frecuencia exacta de medias entradas con 3+ carreras','',per.to_markdown(index=False),'','## Producción según fuerza anual del rival','',agg.to_markdown(index=False),'','## Metodología reproducible','- Universo de juegos jugados: MLB StatsAPI `stats=gameLog`, filtrado por fecha de corte. Esto evita placeholders de aplazamientos presentes en `schedule`.','- Fuerza anual del rival: ranking compuesto de RA/G oficial MLB + ERA- FanGraphs + FIP- FanGraphs en la ventana exacta; puestos 1–10 FUERTE, 11–20 MEDIO, 21–30 DEBIL.','- Media entrada 3+: linescore oficial por gamePk; solo medias entradas realmente bateadas por STL.','- Abridor/bullpen: cada carrera se asigna al `responsiblePitcher` del corredor anotador en el PBP MLB; el abridor rival se identifica por `gamesStarted=1` en el boxscore. Los heredados quedan atribuidos al pitcher responsable.','- Control duro: STARTER_RUNS + BULLPEN_RUNS = RS en cada juego; RBI no se usa como sustituto de carreras.']
+          (OUT/'STL_V12_NOTION_BLOCK.md').write_text('\n'.join(md),encoding='utf-8')
+          print(per.to_string(index=False));print(agg.to_string(index=False));print(json.dumps(qa,indent=2))
+          PY
+      - name: Commit final reconstructed outputs
+        if: always()
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/stl_v12_final || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'STL V1.2: final 425-game specialized reconstruction'; git push; fi
