@@ -1,0 +1,141 @@
+name: TOR V1.4 Close PBP Blocks
+
+on:
+  push:
+    paths:
+      - '.github/workflows/tor-v14-close-pbp-blocks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  reconstruct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests pandas tabulate
+      - name: Reconstruct TOR PBP blocks
+        run: |
+          python - <<'PY'
+          import json,time
+          from pathlib import Path
+          from concurrent.futures import ThreadPoolExecutor,as_completed
+          import requests,pandas as pd
+
+          OUT=Path('runtime/tor_v14_final'); OUT.mkdir(parents=True,exist_ok=True)
+          TEAM_ID=141
+          periods={
+            '2024':('2024-09-29',162,671),
+            '2025':('2025-09-28',162,798),
+            '2026_CUTOFF':('2026-07-22',102,402),
+          }
+          headers={'User-Agent':'Mozilla/5.0 TOR-V1.4-final/1.0'}
+
+          def getj(url,params=None,tries=8):
+            last=None
+            for i in range(tries):
+              try:
+                r=requests.get(url,params=params,headers=headers,timeout=90); r.raise_for_status(); return r.json()
+              except Exception as e:
+                last=e; time.sleep(1.2*(i+1))
+            raise last
+
+          def gamelog(year,end):
+            j=getj(f'https://statsapi.mlb.com/api/v1/teams/{TEAM_ID}/stats',{'stats':'gameLog','group':'hitting','season':year,'gameType':'R'})
+            rows=[]
+            for s in j.get('stats',[{}])[0].get('splits',[]):
+              dt=s.get('date'); pk=(s.get('game') or {}).get('gamePk')
+              if not dt or not pk or dt>end: continue
+              rows.append({'DATE':dt,'GAME_PK':int(pk),'RS_GAMELOG':int((s.get('stat') or {}).get('runs',0))})
+            return pd.DataFrame(rows).drop_duplicates('GAME_PK').sort_values(['DATE','GAME_PK']).reset_index(drop=True)
+
+          universes=[]
+          for label,(end,expected_g,expected_rs) in periods.items():
+            y=int(label[:4]); df=gamelog(y,end)
+            if len(df)!=expected_g: raise RuntimeError(f'{label}: gameLog games {len(df)} != {expected_g}')
+            if int(df.RS_GAMELOG.sum())!=expected_rs: raise RuntimeError(f'{label}: gameLog RS {int(df.RS_GAMELOG.sum())} != {expected_rs}')
+            df['PERIOD']=label; universes.append(df)
+          universe=pd.concat(universes,ignore_index=True)
+          if len(universe)!=426 or universe.GAME_PK.nunique()!=426: raise RuntimeError(f'universe={len(universe)}, unique={universe.GAME_PK.nunique()}')
+          if int(universe.RS_GAMELOG.sum())!=1871: raise RuntimeError(f'RS universe {int(universe.RS_GAMELOG.sum())} !=1871')
+          universe.to_csv(OUT/'tor_426_gamelog_universe.csv',index=False)
+
+          feeds={}
+          def fetch_feed(pk): return int(pk),getj(f'https://statsapi.mlb.com/api/v1.1/game/{int(pk)}/feed/live')
+          with ThreadPoolExecutor(max_workers=14) as ex:
+            futs=[ex.submit(fetch_feed,pk) for pk in universe.GAME_PK.tolist()]
+            for i,f in enumerate(as_completed(futs),1):
+              pk,j=f.result(); feeds[pk]=j
+              if i%50==0: print('feeds',i,'/426')
+          if len(feeds)!=426: raise RuntimeError(f'feeds={len(feeds)} !=426')
+
+          rows=[]; trace=[]
+          for r in universe.itertuples(index=False):
+            pk=int(r.GAME_PK); j=feeds[pk]; gd=j['gameData']; ld=j['liveData']
+            homeid=int(gd['teams']['home']['id']); awayid=int(gd['teams']['away']['id'])
+            ishome=homeid==TEAM_ID; side='home' if ishome else 'away'; oppside='away' if ishome else 'home'; oppid=awayid if ishome else homeid
+            ls=ld['linescore']; rs=int((ls.get('teams',{}).get(side,{}) or {}).get('runs',r.RS_GAMELOG) or 0)
+            if rs!=int(r.RS_GAMELOG): raise RuntimeError(f'{pk}: linescore RS {rs} != gameLog {r.RS_GAMELOG}')
+            inns=[]
+            for inn in ls.get('innings',[]):
+              rr=(inn.get(side,{}) or {}).get('runs')
+              if rr is not None: inns.append((int(inn.get('num',len(inns)+1)),int(rr)))
+
+            oppbox=ld['boxscore']['teams'][oppside]; plist=[int(x) for x in oppbox.get('pitchers',[])]
+            starters=[]
+            for key,p in oppbox.get('players',{}).items():
+              pst=(p.get('stats',{}).get('pitching') or {})
+              if int(pst.get('gamesStarted',0) or 0)==1:
+                pid=(p.get('person') or {}).get('id')
+                if pid is not None: starters.append(int(pid))
+            starter=starters[0] if len(starters)==1 else (plist[0] if plist else None)
+            if starter is None: raise RuntimeError(f'{pk}: no opponent starter')
+
+            sr=br=ur=missing=0; half='bottom' if ishome else 'top'; pset=set(plist)
+            for p in ld['plays']['allPlays']:
+              if p.get('about',{}).get('halfInning')!=half: continue
+              current_pid=(p.get('matchup',{}).get('pitcher') or {}).get('id')
+              for rn in p.get('runners',[]):
+                if rn.get('movement',{}).get('end')!='score': continue
+                det=rn.get('details',{}); rp=det.get('responsiblePitcher'); rpid=rp.get('id') if isinstance(rp,dict) else None
+                source='responsiblePitcher'
+                if rpid is None:
+                  missing+=1; rpid=current_pid; source='currentPitcherFallback'
+                if rpid is None: ur+=1; cls='UNRESOLVED'
+                elif int(rpid)==starter: sr+=1; cls='STARTER'
+                elif int(rpid) in pset: br+=1; cls='BULLPEN'
+                else: ur+=1; cls='UNRESOLVED'
+                trace.append({'PERIOD':r.PERIOD,'DATE':r.DATE,'GAME_PK':pk,'RUNNER_ID':(det.get('runner') or {}).get('id'),'RESPONSIBLE_PITCHER_ID':rpid,'RESPONSIBILITY_SOURCE':source,'STARTER_ID':starter,'CLASS':cls,'INNING':p.get('about',{}).get('inning')})
+            if sr+br+ur!=rs: raise RuntimeError(f'{pk}: attributed {sr+br+ur} != RS {rs}')
+            rows.append({'PERIOD':r.PERIOD,'DATE':r.DATE,'GAME_PK':pk,'IS_HOME':ishome,'OPP_ID':oppid,'RS':rs,'OFF_HALF_INNINGS':len(inns),'HALF_INNINGS_3PLUS':sum(x>=3 for _,x in inns),'GAME_HAS_3PLUS':int(any(x>=3 for _,x in inns)),'STARTER_ID':starter,'STARTER_RUNS':sr,'BULLPEN_RUNS':br,'UNRESOLVED_RUNS':ur,'MISSING_RESPONSIBLE_PITCHER':missing})
+
+          games=pd.DataFrame(rows); t=pd.DataFrame(trace)
+          if len(games)!=426 or int(games.RS.sum())!=1871: raise RuntimeError(f'games/runs={len(games)}/{games.RS.sum()}')
+          if len(t)!=1871: raise RuntimeError(f'trace rows {len(t)} !=1871')
+          if int(games.UNRESOLVED_RUNS.sum())!=0: raise RuntimeError(f'unresolved runs={int(games.UNRESOLVED_RUNS.sum())}')
+          # Fallback to current pitcher is allowed only if responsibility still reconciles exactly; record count for audit.
+          games.to_csv(OUT/'tor_426_game_pbp_reconstruction.csv',index=False); t.to_csv(OUT/'tor_1871_run_responsibility_trace.csv',index=False)
+
+          def pct(v):return round(100*float(v),1)
+          per=[]
+          for period,d in games.groupby('PERIOD'):
+            hi=int(d.HALF_INNINGS_3PLUS.sum()); tot=int(d.OFF_HALF_INNINGS.sum())
+            per.append({'PERIOD':period,'G':len(d),'RS':int(d.RS.sum()),'OFF_HALF_INNINGS':tot,'HALF_INNINGS_3PLUS':hi,'HALF_INNINGS_3PLUS_PCT':pct(hi/tot),'GAMES_WITH_3PLUS':int(d.GAME_HAS_3PLUS.sum()),'GAMES_WITH_3PLUS_PCT':pct(d.GAME_HAS_3PLUS.mean()),'STARTER_RUNS':int(d.STARTER_RUNS.sum()),'STARTER_RUNS_G':round(float(d.STARTER_RUNS.mean()),3),'BULLPEN_RUNS':int(d.BULLPEN_RUNS.sum()),'BULLPEN_RUNS_G':round(float(d.BULLPEN_RUNS.mean()),3),'RESPONSIBLE_PITCHER_FALLBACKS':int(d.MISSING_RESPONSIBLE_PITCHER.sum())})
+          per=pd.DataFrame(per).sort_values('PERIOD'); per.to_csv(OUT/'tor_period_pbp_summary.csv',index=False)
+          qa={'game_counts':games.groupby('PERIOD').size().to_dict(),'rs_sums':games.groupby('PERIOD').RS.sum().astype(int).to_dict(),'total_games':len(games),'total_runs':int(games.RS.sum()),'run_trace_rows':len(t),'unresolved_runs':int(games.UNRESOLVED_RUNS.sum()),'responsible_pitcher_fallbacks':int(games.MISSING_RESPONSIBLE_PITCHER.sum()),'status':'PASS'}
+          (OUT/'qa.json').write_text(json.dumps(qa,indent=2),encoding='utf-8')
+          md=['# TOR V1.4 — CIERRE PBP FINAL','',f"QA: **PASS** — {len(games)} juegos, {int(games.RS.sum())} carreras, {len(t)} trazas, 0 carreras sin clasificación final.",'',per.to_markdown(index=False),'','## Método','- Universo: MLB StatsAPI `stats=gameLog`, filtrado por fecha de corte.','- Media entrada 3+: linescore oficial por gamePk.','- Carreras abridor/bullpen: `responsiblePitcher` de cada corredor anotador; si MLB omite ese campo se registra explícitamente el fallback al pitcher actual y se conserva en la auditoría.','- Abridor rival: `gamesStarted=1` en boxscore; control duro por juego: STARTER_RUNS + BULLPEN_RUNS = RS.','- RBI no se usa como sustituto de carreras.']
+          (OUT/'TOR_V14_NOTION_BLOCK.md').write_text('\n'.join(md),encoding='utf-8')
+          print(per.to_string(index=False)); print(json.dumps(qa,indent=2))
+          PY
+      - name: Commit TOR outputs
+        if: always()
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/tor_v14_final || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'TOR V1.4: close exact big-inning and starter-bullpen PBP blocks'; git push; fi
