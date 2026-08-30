@@ -1,0 +1,39 @@
+name: HBM26 Export V86-V92
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-export-v86-v92.yml'
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify certified CSVs
+        run: |
+          set -euo pipefail
+          for f in \
+            runtime/hbm26_v86_sheet01_0703.csv \
+            runtime/hbm26_v87_sheet01_0704.csv \
+            runtime/hbm26_v88_sheet01_0705.csv \
+            runtime/hbm26_v89_sheet01_0706.csv \
+            runtime/hbm26_v90_sheet01_0707.csv \
+            runtime/hbm26_v91_sheet01_0708.csv \
+            runtime/hbm26_v92_sheet01_0709.csv; do
+            test -s "$f"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hbm26-v86-v92-certified-csv
+          path: |
+            runtime/hbm26_v86_sheet01_0703.csv
+            runtime/hbm26_v87_sheet01_0704.csv
+            runtime/hbm26_v88_sheet01_0705.csv
+            runtime/hbm26_v89_sheet01_0706.csv
+            runtime/hbm26_v90_sheet01_0707.csv
+            runtime/hbm26_v91_sheet01_0708.csv
+            runtime/hbm26_v92_sheet01_0709.csv
+          if-no-files-found: error
+          retention-days: 7
