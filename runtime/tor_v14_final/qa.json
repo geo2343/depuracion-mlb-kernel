@@ -1,0 +1,18 @@
+{
+  "game_counts": {
+    "2024": 162,
+    "2025": 162,
+    "2026_CUTOFF": 102
+  },
+  "rs_sums": {
+    "2024": 671,
+    "2025": 798,
+    "2026_CUTOFF": 402
+  },
+  "total_games": 426,
+  "total_runs": 1871,
+  "run_trace_rows": 1871,
+  "unresolved_runs": 0,
+  "responsible_pitcher_fallbacks": 0,
+  "status": "PASS"
+}
