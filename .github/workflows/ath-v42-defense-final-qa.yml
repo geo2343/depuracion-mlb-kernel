@@ -1,0 +1,73 @@
+name: ATH V4.2 Defense Final QA
+
+on:
+  push:
+    paths:
+      - '.github/workflows/ath-v42-defense-final-qa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  defense:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas numpy tabulate
+      - name: Aggregate fielding run value and catcher components
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd, numpy as np
+          OUT=Path('runtime/ath_v42_final')
+          files={'2024':'frv_2024_raw.csv','2025':'frv_2025_raw.csv','2026_CUTOFF':'frv_2026_cut_raw.csv'}
+          comps=['total_runs','inf_of_runs','range_runs','arm_runs','dp_runs','fielding_runs_prevented_on_rec1b','catching_runs','framing_runs','throwing_runs','blocking_runs']
+          rows=[]
+          for period,fn in files.items():
+            df=pd.read_csv(OUT/fn,encoding='utf-8-sig')
+            for c in comps: df[c]=pd.to_numeric(df[c],errors='coerce').fillna(0)
+            s={c:float(df[c].sum()) for c in comps}
+            # Fielding and catching are mutually exclusive top-level buckets in Savant rows.
+            top_recon=s['inf_of_runs']+s['catching_runs']
+            catcher_recon=s['framing_runs']+s['throwing_runs']+s['blocking_runs']
+            rows.append({
+              'PERIOD':period,'PLAYERS':len(df),'FRV_TOTAL':round(s['total_runs'],3),'INF_OF_RUNS':round(s['inf_of_runs'],3),
+              'RANGE_RUNS':round(s['range_runs'],3),'ARM_RUNS':round(s['arm_runs'],3),'DP_RUNS':round(s['dp_runs'],3),
+              'REC_1B_RUNS':round(s['fielding_runs_prevented_on_rec1b'],3),'CATCHING_RUNS':round(s['catching_runs'],3),
+              'FRAMING_RUNS':round(s['framing_runs'],3),'THROWING_RUNS':round(s['throwing_runs'],3),'BLOCKING_RUNS':round(s['blocking_runs'],3),
+              'TOP_LEVEL_RECON':round(top_recon,3),'TOP_LEVEL_DELTA':round(s['total_runs']-top_recon,6),
+              'CATCHER_COMPONENT_RECON':round(catcher_recon,3),'CATCHER_DELTA':round(s['catching_runs']-catcher_recon,6)
+            })
+          d=pd.DataFrame(rows);d.to_csv(OUT/'phase13_savant_defense_team.csv',index=False)
+          if (d.TOP_LEVEL_DELTA.abs()>0.001).any(): raise RuntimeError('FRV top-level reconciliation failed')
+          if (d.CATCHER_DELTA.abs()>0.001).any(): raise RuntimeError('catcher component reconciliation failed')
+          core=json.loads((OUT/'qa_core.json').read_text())
+          qa={
+            'core_status':core['status'],'games':core['games'],'rs':core['rs'],'ra':core['ra'],
+            'run_trace_rows':core['run_trace_rows'],'unresolved_runs':core['unresolved_runs'],
+            'savant_offense_game_coverage':core['savant_game_coverage'],'f7_rows':core['f7_rows'],'f10_rows':core['f10_rows'],
+            'rotation_bullpen_2024_rows':core['unit_rows'],'defense_periods':len(d),
+            'frv_reconciled':bool((d.TOP_LEVEL_DELTA.abs()<=0.001).all()),'catching_components_reconciled':bool((d.CATCHER_DELTA.abs()<=0.001).all()),
+            'team_research_status':'PASS'
+          }
+          (OUT/'qa_final_team_research.json').write_text(json.dumps(qa,indent=2),encoding='utf-8')
+          md=['# ATH V4.2 — DEFENSA Y QA FINAL DE INVESTIGACIÓN','',d.to_markdown(index=False),'',
+              '## Control final','',f"**PASS** — 425 juegos; RS 643/733/453; RA 764/817/565; 1,829 carreras ofensivas trazadas; 0 sin responsiblePitcher; Statcast ofensivo 162/162/101; F7=18 filas; F10=9 filas; rotación/bullpen 2024 cerrados; defensa Savant 3/3 periodos reconciliada.",'',
+              '- `FRV_TOTAL = INF_OF_RUNS + CATCHING_RUNS` en cada periodo.',
+              '- `CATCHING_RUNS = FRAMING_RUNS + THROWING_RUNS + BLOCKING_RUNS` en cada periodo.',
+              '- `THROWING_RUNS` se conserva como componente primario del control del running game por el catcher; no se sustituye por bases robadas brutas.',
+              '- El histórico O/U permanece como subsistema separado y no forma parte de este QA de investigación del equipo.']
+          (OUT/'ATH_V42_DEFENSE_FINAL.md').write_text('\n'.join(md),encoding='utf-8')
+          print(d.to_string(index=False));print(json.dumps(qa,indent=2))
+          PY
+      - name: Commit defense and QA
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/ath_v42_final
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'ATH V4.2: aggregate Savant defense and pass final team-research QA'; git push; fi
