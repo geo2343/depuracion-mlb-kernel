@@ -1,0 +1,90 @@
+name: HBM26 V98 0718 Incremental
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hbm26-v98-0718-incremental.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet pandas pyarrow requests
+      - name: Run sequential daily QA for 2026-07-18
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+          from datetime import date
+          import csv
+
+          src = Path('.github/workflows/hbm26-v5-0413-incremental.yml').read_text(encoding='utf-8')
+          start_marker = "          python - <<'PY'\n"
+          end_marker = "\n          PY\n"
+          start = src.index(start_marker) + len(start_marker)
+          end = src.index(end_marker, start)
+          template = dedent(src[start:end])
+          template = template.replace(
+              "    r=S.get(u,timeout=120); r.raise_for_status(); df=pd.read_csv(io.StringIO(r.text))",
+              "    last=None\n"
+              "    for _i in range(8):\n"
+              "        try:\n"
+              "            r=S.get(u,timeout=120); r.raise_for_status(); break\n"
+              "        except Exception as e:\n"
+              "            last=e; time.sleep(2.0*(_i+1))\n"
+              "    else:\n"
+              "        raise last\n"
+              "    df=pd.read_csv(io.StringIO(r.text))"
+          )
+
+          ver = 98
+          target = date(2026,7,18)
+          prior_end = date(2026,7,17)
+          suffix = '0718'
+          parent_ver = 97
+
+          parent_bull = Path(f'runtime/hbm26_v{parent_ver}_bullpen.csv')
+          if not parent_bull.exists():
+              raise FileNotFoundError(parent_bull)
+          with parent_bull.open('r', encoding='utf-8', newline='') as f:
+              prior_bull_rows = max(sum(1 for _ in f) - 1, 0)
+
+          code = template
+          code = code.replace("OUT/'hbm26_v4_all_recon.csv'", "OUT/'__PARENT_ALL_RECON__.csv'")
+          code = code.replace("OUT/'hbm26_v4_bullpen.csv'", "OUT/'__PARENT_BULLPEN__.csv'")
+          code = code.replace(
+              'TARGET=date(2026,4,13); PRIOR_END=date(2026,4,12)',
+              f'TARGET=date({target.year},{target.month},{target.day}); PRIOR_END=date({prior_end.year},{prior_end.month},{prior_end.day})'
+          )
+          code = code.replace('HBM-26-V5-0413/1.0', f'HBM-26-V{ver}-{suffix}/1.0')
+          code = code.replace('prior_bull_rows==1557', f'prior_bull_rows=={prior_bull_rows}')
+          code = code.replace('Parent V4 gate failed', f'Parent V{parent_ver} gate failed')
+          code = code.replace('hbm26_v5', f'hbm26_v{ver}')
+          code = code.replace('0413', suffix)
+          code = code.replace('QA_VALIDATED_CANONICAL_V5', f'QA_VALIDATED_CANONICAL_V{ver}')
+          code = code.replace('QA_VALIDATED_PBP_V5', f'QA_VALIDATED_PBP_V{ver}')
+          code = code.replace('V5 2026-04-13 QA failed', f'V{ver} {target.isoformat()} QA failed')
+          code = code.replace("OUT/'__PARENT_ALL_RECON__.csv'", f"OUT/'hbm26_v{parent_ver}_all_recon.csv'")
+          code = code.replace("OUT/'__PARENT_BULLPEN__.csv'", f"OUT/'hbm26_v{parent_ver}_bullpen.csv'")
+
+          filename = f'hbm26_v{ver}_{suffix}_derived.py'
+          compile(code, filename, 'exec')
+          print(f'RUNNING V{ver} {target.isoformat()} with parent rows={prior_bull_rows}')
+          exec(compile(code, filename, 'exec'), {'__name__': '__main__'})
+          print(f'PASSED V{ver} {target.isoformat()}')
+          PY
+      - name: Commit V98 outputs
+        if: always()
+        run: |
+          git config user.name 'hbm26-qa-bot'
+          git config user.email 'hbm26-qa-bot@users.noreply.github.com'
+          git add runtime/hbm26_v98_* || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: validated backfill 2026-07-18 (V98)'; git push; fi
