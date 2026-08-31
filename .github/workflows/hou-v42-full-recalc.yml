@@ -1,0 +1,53 @@
+name: HOU V4.2 Full Recalc
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hou-v42-full-recalc.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests pandas numpy tabulate
+      - name: Reconstruct Houston audit gaps from validated BAL kernel
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+          src=Path('.github/workflows/bal-v42-full-recalc.yml').read_text(encoding='utf-8')
+          code=src.split("python - <<'PY'\n",1)[1].rsplit("\n          PY",1)[0]
+          code=textwrap.dedent(code)
+          reps=[
+            ("runtime/bal_v42_final","runtime/hou_v42_final"),
+            ("TEAM_ID=110;TEAM='BAL'","TEAM_ID=117;TEAM='HOU'"),
+            ("BAL-V4.2","HOU-V4.2"),
+            ("BAL V4.2","HOU V4.2"),
+            ("Baltimore","Houston"),
+            ("BAL starter","HOU starter"),
+            ("'2024':('2024-03-28','2024-09-29',162,3.166)","'2024':('2024-03-28','2024-09-29',161,3.166)"),
+            ("'2026_CUTOFF':('2026-03-25','2026-07-20',101,None)","'2026_CUTOFF':('2026-03-25','2026-07-22',103,None)"),
+            ("2026-07-20","2026-07-22"),
+            ("bal_425","hou_426"),
+            ("bal_","hou_"),
+            ("425","426")
+          ]
+          for a,b in reps: code=code.replace(a,b)
+          ns={'__name__':'__main__'}
+          exec(compile(code,'<hou-v42-generated>','exec'),ns,ns)
+          PY
+      - name: Commit outputs
+        if: always()
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/hou_v42_final || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HOU V4.2: rebuild reproducible team research'; git push; fi
