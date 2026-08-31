@@ -1,0 +1,29 @@
+{
+  "games": {
+    "2024": 162,
+    "2025": 162,
+    "2026_CUTOFF": 101
+  },
+  "rs": {
+    "2024": 643,
+    "2025": 733,
+    "2026_CUTOFF": 453
+  },
+  "ra": {
+    "2024": 764,
+    "2025": 817,
+    "2026_CUTOFF": 565
+  },
+  "run_trace_rows": 1829,
+  "unresolved_runs": 0,
+  "savant_game_coverage": {
+    "2024": 162,
+    "2025": 162,
+    "2026_CUTOFF": 101
+  },
+  "f7_rows": 18,
+  "f10_rows": 9,
+  "statcast_period_rows": 3,
+  "unit_rows": 2,
+  "status": "PASS"
+}
