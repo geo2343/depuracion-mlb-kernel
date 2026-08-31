@@ -88,3 +88,5 @@ jobs:
           git config user.email 'hbm26-qa-bot@users.noreply.github.com'
           git add runtime/hbm26_v99_* || true
           if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'HBM-26: validated backfill 2026-07-19 (V99)'; git push; fi
+
+# trigger V99 after V98 closure
