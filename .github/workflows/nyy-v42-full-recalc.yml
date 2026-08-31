@@ -1,0 +1,61 @@
+name: NYY V4.2 Full Recalc
+
+on:
+  push:
+    paths:
+      - '.github/workflows/nyy-v42-full-recalc.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests pandas numpy tabulate
+      - name: Reconstruct Yankees audit gaps from validated BAL kernel
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap, requests
+          H={'User-Agent':'Mozilla/5.0 NYY-V4.2/1.0'}
+          j=requests.get('https://statsapi.mlb.com/api/v1/teams/147/stats',params={'stats':'gameLog','group':'hitting','season':2026,'gameType':'R'},headers=H,timeout=90).json()
+          seen=set()
+          for s in j.get('stats',[{}])[0].get('splits',[]):
+            dt=s.get('date');pk=(s.get('game') or {}).get('gamePk')
+            if dt and pk and dt<='2026-07-22':seen.add(int(pk))
+          n26=len(seen); total=324+n26
+          print('NYY 2026 cutoff games',n26,'total universe',total)
+          src=Path('.github/workflows/bal-v42-full-recalc.yml').read_text(encoding='utf-8')
+          code=src.split("python - <<'PY'\n",1)[1].rsplit("\n          PY",1)[0]
+          code=textwrap.dedent(code)
+          reps=[
+            ("runtime/bal_v42_final","runtime/nyy_v42_final"),
+            ("TEAM_ID=110;TEAM='BAL'","TEAM_ID=147;TEAM='NYY'"),
+            ("BAL-V4.2","NYY-V4.2"),
+            ("BAL V4.2","NYY V4.2"),
+            ("Baltimore","New York Yankees"),
+            ("BAL starter","NYY starter"),
+            ("'2026_CUTOFF':('2026-03-25','2026-07-20',101,None)",f"'2026_CUTOFF':('2026-03-25','2026-07-22',{n26},None)"),
+            ("if cov!={'2024':162,'2025':162,'2026_CUTOFF':101}",f"if cov!={{'2024':162,'2025':162,'2026_CUTOFF':{n26}}}"),
+            ("2026-07-20","2026-07-22"),
+            ("bal_425",f"nyy_{total}"),
+            ("bal_","nyy_"),
+            ("425",str(total))
+          ]
+          for a,b in reps: code=code.replace(a,b)
+          ns={'__name__':'__main__'}
+          exec(compile(code,'<nyy-v42-generated>','exec'),ns,ns)
+          PY
+      - name: Commit outputs
+        if: always()
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/nyy_v42_final || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'NYY V4.2: rebuild reproducible team research'; git push; fi
