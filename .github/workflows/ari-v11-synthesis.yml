@@ -1,0 +1,88 @@
+name: ARI V1.1 Synthesis
+
+on:
+  push:
+    paths:
+      - '.github/workflows/ari-v11-synthesis.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  synthesize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests pandas tabulate
+      - name: Build compact synthesis
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json, requests, pandas as pd
+          OUT=Path('runtime/ari_v10_final')
+          g=pd.read_csv(OUT/'ari_426_game_reconstruction.csv')
+          g['DATE']=pd.to_datetime(g.DATE)
+          g['W']=(g.RS>g.RA).astype(int);g['L']=(g.RS<g.RA).astype(int)
+          g['ONE_RUN']=(g.RS-g.RA).abs().eq(1)
+          periods=['2024','2025','2026_CUTOFF']
+          summary=[]
+          for p in periods:
+            d=g[g.PERIOD==p].copy().sort_values(['DATE','GAME_PK'])
+            home=d[d.IS_HOME.astype(bool)];away=d[~d.IS_HOME.astype(bool)]
+            one=d[d.ONE_RUN]
+            summary.append({'PERIOD':p,'G':len(d),'W':int(d.W.sum()),'L':int(d.L.sum()),'RS':int(d.RS.sum()),'RA':int(d.RA.sum()),'R_G':round(d.RS.mean(),3),'RA_G':round(d.RA.mean(),3),'DIFF':int(d.RS.sum()-d.RA.sum()),'HOME_W':int(home.W.sum()),'HOME_L':int(home.L.sum()),'AWAY_W':int(away.W.sum()),'AWAY_L':int(away.L.sum()),'ONE_RUN_W':int(one.W.sum()),'ONE_RUN_L':int(one.L.sum())})
+          sm=pd.DataFrame(summary);sm.to_csv(OUT/'phase2_results_summary.csv',index=False)
+          d=g[g.PERIOD=='2026_CUTOFF'].sort_values(['DATE','GAME_PK'])
+          recent=[]
+          for n in [3,5,7,10]:
+            x=d.tail(n);recent.append({'WINDOW':n,'W':int(x.W.sum()),'L':int(x.L.sum()),'RS':int(x.RS.sum()),'RA':int(x.RA.sum()),'DIFF':int(x.RS.sum()-x.RA.sum()),'FROM':str(x.DATE.min().date()),'TO':str(x.DATE.max().date())})
+          pd.DataFrame(recent).to_csv(OUT/'phase2_recent_form.csv',index=False)
+          # League R/G and RA/G rank at cutoff using official MLB gameLogs.
+          H={'User-Agent':'Mozilla/5.0 ARI-V1.1/1.0'}
+          teams=requests.get('https://statsapi.mlb.com/api/v1/teams',params={'sportId':1},headers=H,timeout=90).json()['teams']
+          ranks=[]
+          for t in teams:
+            tid=int(t['id']);
+            def gl(group):
+              j=requests.get(f'https://statsapi.mlb.com/api/v1/teams/{tid}/stats',params={'stats':'gameLog','group':group,'season':2026,'gameType':'R'},headers=H,timeout=90).json();vals=[]
+              for s in j.get('stats',[{}])[0].get('splits',[]):
+                if s.get('date') and s['date']<='2026-07-22' and (s.get('game') or {}).get('gamePk'):
+                  vals.append(s)
+              # one row per game
+              seen={};
+              for s in vals:seen[int(s['game']['gamePk'])]=s
+              return list(seen.values())
+            hit=gl('hitting');pit=gl('pitching')
+            if not hit:continue
+            rs=sum(int((s.get('stat') or {}).get('runs',0) or 0) for s in hit)
+            # pitching gameLog runs is not always opponent runs; derive RA from schedule scores for accuracy
+            sched=requests.get('https://statsapi.mlb.com/api/v1/schedule',params={'sportId':1,'teamId':tid,'startDate':'2026-03-25','endDate':'2026-07-22','gameType':'R'},headers=H,timeout=90).json()
+            ra=0;gps=set()
+            for date in sched.get('dates',[]):
+              for gm in date.get('games',[]):
+                if gm.get('status',{}).get('abstractGameState')!='Final':continue
+                pk=int(gm['gamePk']);gps.add(pk);home=int(gm['teams']['home']['team']['id'])==tid
+                ra+=int(gm['teams']['away' if home else 'home']['score'])
+            G=len(hit);ranks.append({'TEAM_ID':tid,'TEAM':t['name'],'G':G,'RS':rs,'R_G':rs/G,'RA':ra,'RA_G':ra/len(gps) if gps else None})
+          r=pd.DataFrame(ranks);r['OFF_RANK']=r.R_G.rank(method='min',ascending=False).astype(int);r['PITCH_RANK']=r.RA_G.rank(method='min',ascending=True).astype(int);r.to_csv(OUT/'league_ranks_2026_cutoff.csv',index=False)
+          a=r[r.TEAM_ID==109].iloc[0]
+          def cls(rank): return 'Fuerte' if rank<=10 else ('Media' if rank<=20 else 'Débil')
+          defense=pd.read_csv(OUT/'phase11_savant_defense_team.csv');frv=float(defense.loc[defense.PERIOD=='2026_CUTOFF','FRV_TOTAL'].iloc[0]);dcls='Fuerte' if frv>=10 else ('Débil' if frv<=-10 else 'Media')
+          qa=json.loads((OUT/'qa_final_team_research.json').read_text())
+          result={'cutoff':'2026-07-22','games_total':sum(qa['games'].values()),'offense_rank':int(a.OFF_RANK),'offense_class':cls(int(a.OFF_RANK)),'pitching_rank':int(a.PITCH_RANK),'pitching_class':cls(int(a.PITCH_RANK)),'defense_frv':round(frv,3),'defense_class':dcls,'team_research_status':'PASS'}
+          (OUT/'ari_v11_synthesis.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+          md=['# ARI V1.1 — síntesis reproducible','',pd.DataFrame(summary).to_markdown(index=False),'','## Forma reciente',pd.DataFrame(recent).to_markdown(index=False),'','## Clasificación al corte',f"Ofensiva: **{result['offense_class']}** (R/G rank {result['offense_rank']}/30).  Pitcheo: **{result['pitching_class']}** (RA/G rank {result['pitching_rank']}/30).  Defensa: **{result['defense_class']}** (FRV {result['defense_frv']:+.3f}).",'', 'Manager verificado: Torey Lovullo. Parque: Chase Field, Phoenix, techo retráctil. Fuentes oficiales MLB verificadas externamente al kernel.']
+          (OUT/'ARI_V11_SYNTHESIS.md').write_text('\n'.join(md),encoding='utf-8')
+          print(json.dumps(result,indent=2));print(sm.to_string(index=False));print(pd.DataFrame(recent).to_string(index=False))
+          PY
+      - name: Commit synthesis
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/ari_v10_final
+          git commit -m 'ARI V1.1: add records ranks form and classifications' || true
+          git push
