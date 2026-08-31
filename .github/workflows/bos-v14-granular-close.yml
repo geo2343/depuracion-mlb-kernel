@@ -1,0 +1,212 @@
+name: BOS V14 Granular Close
+
+on:
+  push:
+    paths:
+      - '.github/workflows/bos-v14-granular-close.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  granular:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests pandas numpy tabulate
+      - name: Reconstruct pregame granular blocks
+        run: |
+          python - <<'PY'
+          import io,json,time,math
+          from pathlib import Path
+          from concurrent.futures import ThreadPoolExecutor,as_completed
+          import requests,pandas as pd,numpy as np
+
+          OUT=Path('runtime/bos_v14_granular');OUT.mkdir(parents=True,exist_ok=True)
+          TEAM_ID=111; GAME_PK=824733; CUTOFF='2026-07-23'
+          H={'User-Agent':'Mozilla/5.0 BOS-V14/1.0'}
+          HIT={'single','double','triple','home_run'}; XBH={'double','triple','home_run'}; BB={'walk','intent_walk'}; K={'strikeout','strikeout_double_play'}
+          SW={'swinging_strike','swinging_strike_blocked','foul','foul_tip','hit_into_play','hit_into_play_no_out','hit_into_play_score'}
+          WH={'swinging_strike','swinging_strike_blocked'}
+          AB_EV={'single','double','triple','home_run','field_out','force_out','grounded_into_double_play','field_error','fielders_choice','fielders_choice_out','strikeout','strikeout_double_play','double_play','triple_play'}
+          FAM={'FF':'FASTBALL','SI':'FASTBALL','FC':'FASTBALL','SL':'BREAKING','ST':'BREAKING','SV':'BREAKING','CU':'BREAKING','KC':'BREAKING','CS':'BREAKING','CH':'OFFSPEED','FS':'OFFSPEED','FO':'OFFSPEED','SC':'OFFSPEED'}
+
+          def getj(url,params=None,tries=7):
+            last=None
+            for i in range(tries):
+              try:
+                r=requests.get(url,params=params,headers=H,timeout=90);r.raise_for_status();return r.json()
+              except Exception as e:last=e;time.sleep(1.2*(i+1))
+            raise last
+          def sav(pk,tries=7):
+            url=f'https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk={int(pk)}';last=None
+            for i in range(tries):
+              try:
+                r=requests.get(url,headers=H,timeout=90);r.raise_for_status();d=pd.read_csv(io.StringIO(r.text))
+                if d.empty:raise RuntimeError('empty')
+                return int(pk),d
+              except Exception as e:last=e;time.sleep(1.3*(i+1))
+            raise last
+          def safediv(a,b): return float(a)/float(b) if b else np.nan
+          def woba_x(d):
+            q=d[d.events.notna()].copy();wv=pd.to_numeric(q.woba_value,errors='coerce');wd=pd.to_numeric(q.woba_denom,errors='coerce');est=pd.to_numeric(q.estimated_woba_using_speedangle,errors='coerce');xc=wv.copy();xc.loc[est.notna()]=est.loc[est.notna()]
+            den=wd.fillna(0).sum();return (safediv(wv.fillna(0).sum(),den),safediv(xc.fillna(0).sum(),den))
+          def metrics(d):
+            if d.empty:return {'PITCHES':0,'PA':0,'BBE':0,'SWING_PCT':np.nan,'CHASE_PCT':np.nan,'CONTACT_PCT':np.nan,'WHIFF_PCT':np.nan,'EV':np.nan,'HARD_HIT_PCT':np.nan,'BARREL_PCT':np.nan,'WOBA':np.nan,'XWOBA':np.nan}
+            desc=d.description.astype(str);sw=desc.isin(SW);wh=desc.isin(WH);zone=pd.to_numeric(d.zone,errors='coerce');out=~zone.isin(range(1,10));bbe=d[pd.to_numeric(d.launch_speed,errors='coerce').notna()];w,x=woba_x(d)
+            return {'PITCHES':len(d),'PA':int(d.events.notna().sum()),'BBE':len(bbe),'SWING_PCT':100*safediv(sw.sum(),len(d)),'CHASE_PCT':100*safediv((sw&out).sum(),out.sum()),'CONTACT_PCT':100*safediv(sw.sum()-wh.sum(),sw.sum()),'WHIFF_PCT':100*safediv(wh.sum(),sw.sum()),'EV':pd.to_numeric(bbe.launch_speed,errors='coerce').mean(),'HARD_HIT_PCT':100*safediv((pd.to_numeric(bbe.launch_speed,errors='coerce')>=95).sum(),len(bbe)),'BARREL_PCT':100*safediv((pd.to_numeric(bbe.launch_speed_angle,errors='coerce')==6).sum(),len(bbe)),'WOBA':w,'XWOBA':x}
+
+          # Official starting lineup from final feed, using original batting-order slots x00.
+          feed=getj(f'https://statsapi.mlb.com/api/v1.1/game/{GAME_PK}/feed/live')
+          gd=feed['gameData'];ld=feed['liveData'];hid=int(gd['teams']['home']['id']);side='home' if hid==TEAM_ID else 'away'
+          players=ld['boxscore']['teams'][side]['players'];line=[]
+          for pp in players.values():
+            bo=str(pp.get('battingOrder') or '')
+            if len(bo)==3 and bo.endswith('00'):
+              line.append({'ORDER':int(bo[0]),'BATTER_ID':int(pp['person']['id']),'BATTER':pp['person']['fullName'],'STAND':(pp.get('person') or {}).get('batSide',{}).get('code')})
+          line=pd.DataFrame(line).sort_values('ORDER').drop_duplicates('ORDER')
+          if len(line)!=9: raise RuntimeError(f'lineup starters {len(line)}')
+          line.to_csv(OUT/'official_lineup.csv',index=False)
+          ids=set(line.BATTER_ID.astype(int)); name=dict(zip(line.BATTER_ID.astype(int),line.BATTER))
+
+          # Boston regular-season universe through Jul 23 (last completed game Jul 22).
+          gl=getj(f'https://statsapi.mlb.com/api/v1/teams/{TEAM_ID}/stats',{'stats':'gameLog','group':'hitting','season':2026,'gameType':'R'})
+          games=[]
+          for s in gl.get('stats',[{}])[0].get('splits',[]):
+            dt=s.get('date');pk=(s.get('game') or {}).get('gamePk')
+            if dt and pk and dt<=CUTOFF:games.append((dt,int(pk)))
+          games=sorted(dict((pk,dt) for dt,pk in games).items(),key=lambda x:x[1]); gpks=[pk for pk,dt in games]
+          if len(gpks)!=101:raise RuntimeError(f'BOS pregame games {len(gpks)} !=101')
+          frames=[]
+          with ThreadPoolExecutor(max_workers=12) as ex:
+            fs=[ex.submit(sav,pk) for pk in gpks]
+            for i,f in enumerate(as_completed(fs),1):
+              pk,d=f.result();frames.append(d)
+          z=pd.concat(frames,ignore_index=True);z['game_pk']=pd.to_numeric(z.game_pk,errors='coerce').astype('Int64')
+          # Boston batting side via home_team/away_team.
+          bot=z.inning_topbot.astype(str).str.lower().isin(['bot','bottom']);top=z.inning_topbot.astype(str).str.lower().eq('top')
+          home=z.home_team.astype(str).eq('BOS');bat=z[(home&bot)|((~home)&top)].copy();bat=bat[bat.batter.isin(ids)].copy()
+          if bat.batter.nunique()!=9:raise RuntimeError(f'lineup batter coverage {bat.batter.nunique()}')
+          bat['game_date']=pd.to_datetime(bat.game_date)
+
+          # U10 = 10 latest completed team games.
+          u10pks=set(gpks[-10:]);u10=bat[bat.game_pk.isin(u10pks)].copy()
+          if u10.game_pk.nunique()!=10:raise RuntimeError('U10 game coverage')
+
+          # B11 event frequency and PA intervals per hitter.
+          b11=[];event_names=['HIT','XBH','HR','BB','K','HARD_HIT','BARREL','ON_BASE']
+          for bid in line.BATTER_ID.astype(int):
+            d=u10[u10.batter==bid].copy();pa=d[d.events.notna()].sort_values(['game_date','game_pk','at_bat_number']).reset_index(drop=True);pa['PA_IDX']=np.arange(1,len(pa)+1)
+            ev=pa.events.astype(str);ls=pd.to_numeric(pa.launch_speed,errors='coerce');lsa=pd.to_numeric(pa.launch_speed_angle,errors='coerce')
+            masks={'HIT':ev.isin(HIT),'XBH':ev.isin(XBH),'HR':ev.eq('home_run'),'BB':ev.isin(BB),'K':ev.isin(K),'HARD_HIT':ls.ge(95),'BARREL':lsa.eq(6),'ON_BASE':ev.isin(HIT|BB|{'hit_by_pitch'})}
+            for en in event_names:
+              idx=pa.loc[masks[en],'PA_IDX'].astype(int).tolist();gaps=np.diff(idx).tolist() if len(idx)>=2 else []
+              b11.append({'BATTER_ID':bid,'BATTER':name[bid],'EVENT':en,'PA_SAMPLE':len(pa),'EVENTS':len(idx),'RATE_PER_PA':safediv(len(idx),len(pa)),'PA_SINCE_LAST':(len(pa)-idx[-1]) if idx else len(pa),'INTERVAL_MIN':min(gaps) if gaps else np.nan,'INTERVAL_MAX':max(gaps) if gaps else np.nan,'INTERVAL_MEAN':np.mean(gaps) if gaps else np.nan,'INTERVAL_MEDIAN':np.median(gaps) if gaps else np.nan,'CONCENTRATION_GAMES':pa.loc[masks[en],'game_pk'].nunique() if len(pa) else 0,'NOTE':'Intervalo descriptivo; no implica deuda estadística.'})
+          b11=pd.DataFrame(b11);b11.to_csv(OUT/'B11_event_intervals.csv',index=False)
+
+          # Trey Yesavage identity and season pitches through Jul23.
+          ps=getj('https://statsapi.mlb.com/api/v1/people/search',{'names':'Trey Yesavage'}).get('people',[])
+          if not ps:raise RuntimeError('Yesavage not found')
+          yid=int(ps[0]['id']);(OUT/'yesavage_id.txt').write_text(str(yid))
+          ygl=getj(f'https://statsapi.mlb.com/api/v1/people/{yid}/stats',{'stats':'gameLog','group':'pitching','season':2026,'gameType':'R'})
+          yg=[]
+          for s in ygl.get('stats',[{}])[0].get('splits',[]):
+            dt=s.get('date');pk=(s.get('game') or {}).get('gamePk')
+            if dt and pk and dt<=CUTOFF:yg.append((dt,int(pk)))
+          yg=sorted(set(yg));yframes=[]
+          with ThreadPoolExecutor(max_workers=8) as ex:
+            fs=[ex.submit(sav,pk) for dt,pk in yg]
+            for f in as_completed(fs):pk,d=f.result();yframes.append(d)
+          yz=pd.concat(yframes,ignore_index=True);yp=yz[pd.to_numeric(yz.pitcher,errors='coerce').eq(yid)].copy();yp['game_date']=pd.to_datetime(yp.game_date);yp['FAMILY']=yp.pitch_type.astype(str).map(FAM).fillna('OTHER')
+          if yp.game_pk.nunique()<10:raise RuntimeError(f'Yesavage games only {yp.game_pk.nunique()}')
+
+          # B13 pitcher shape + recent deltas, and hitter empirical compatibility by pitch type.
+          shape=[]
+          for pt,d in yp.groupby('pitch_type'):
+            if str(pt)=='nan':continue
+            recent=d[d.game_date>=pd.Timestamp(CUTOFF)-pd.Timedelta(days=30)]
+            m=metrics(d);mr=metrics(recent);vel=pd.to_numeric(d.release_speed,errors='coerce');px=pd.to_numeric(d.pfx_x,errors='coerce')*12;pz=pd.to_numeric(d.pfx_z,errors='coerce')*12
+            shape.append({'PITCH_TYPE':pt,'FAMILY':FAM.get(str(pt),'OTHER'),'PITCHES':len(d),'PA':m['PA'],'BBE':m['BBE'],'USE_PCT':100*len(d)/len(yp),'VELO':vel.mean(),'VELO_BAND':'HIGH' if vel.mean()>=92 else ('MEDIUM' if vel.mean()>=85 else 'LOW'),'PFX_X_IN':px.mean(),'PFX_Z_IN':pz.mean(),'SPIN':pd.to_numeric(d.release_spin_rate,errors='coerce').mean(),'WOBA_ALLOWED':m['WOBA'],'XWOBA_ALLOWED':m['XWOBA'],'WHIFF_PCT':m['WHIFF_PCT'],'RECENT30_VELO':pd.to_numeric(recent.release_speed,errors='coerce').mean(),'VELO_DELTA_30D':pd.to_numeric(recent.release_speed,errors='coerce').mean()-vel.mean() if len(recent) else np.nan,'PFX_X_DELTA_30D':(pd.to_numeric(recent.pfx_x,errors='coerce').mean()-pd.to_numeric(d.pfx_x,errors='coerce').mean())*12 if len(recent) else np.nan,'PFX_Z_DELTA_30D':(pd.to_numeric(recent.pfx_z,errors='coerce').mean()-pd.to_numeric(d.pfx_z,errors='coerce').mean())*12 if len(recent) else np.nan})
+          shape=pd.DataFrame(shape).sort_values('PITCHES',ascending=False);shape.to_csv(OUT/'B13_yesavage_shape.csv',index=False)
+          mainpts=shape.head(4).PITCH_TYPE.astype(str).tolist(); compat=[]
+          for bid in line.BATTER_ID.astype(int):
+            for pt in mainpts:
+              d=bat[(bat.batter==bid)&(bat.pitch_type.astype(str)==pt)].copy();m=metrics(d);ys=shape[shape.PITCH_TYPE.astype(str)==pt].iloc[0]
+              la=pd.to_numeric(d.launch_angle,errors='coerce').mean();delta=m['XWOBA']-ys.XWOBA_ALLOWED if pd.notna(m['XWOBA']) and pd.notna(ys.XWOBA_ALLOWED) else np.nan
+              label='SIN_MUESTRA' if m['PITCHES']<20 else ('FAVORABLE_BATEADOR' if pd.notna(delta) and delta>=.04 else ('FAVORABLE_PITCHER' if pd.notna(delta) and delta<=-.04 else 'NEUTRAL'))
+              compat.append({'BATTER_ID':bid,'BATTER':name[bid],'PITCH_TYPE':pt,'PITCHES':m['PITCHES'],'PA':m['PA'],'BBE':m['BBE'],'BATTER_WOBA':m['WOBA'],'BATTER_XWOBA':m['XWOBA'],'BATTER_WHIFF_PCT':m['WHIFF_PCT'],'BATTER_LA_PROXY':la,'YESAVAGE_XWOBA_ALLOWED':ys.XWOBA_ALLOWED,'DELTA_XWOBA':delta,'PLANE_COMPAT_PROXY':label,'NOTE':'Proxy empírico de plano: resultado/proceso y ángulo de salida frente al tipo; no biometría.'})
+          compat=pd.DataFrame(compat);compat.to_csv(OUT/'B13_batter_pitch_compatibility.csv',index=False)
+
+          # B14 custom six-zone matrix for each hitter.
+          def zone_bucket(r):
+            x=pd.to_numeric(pd.Series([r.plate_x]),errors='coerce').iloc[0];zz=pd.to_numeric(pd.Series([r.plate_z]),errors='coerce').iloc[0];topv=pd.to_numeric(pd.Series([r.sz_top]),errors='coerce').iloc[0];botv=pd.to_numeric(pd.Series([r.sz_bot]),errors='coerce').iloc[0]
+            if any(pd.isna(v) for v in [x,zz,topv,botv]) or topv<=botv:return 'UNKNOWN'
+            zn=(zz-botv)/(topv-botv);vert='LOW' if zn<.33 else ('MID' if zn<.67 else 'HIGH');stand=str(r.stand);inside=(x<0 if stand=='R' else x>0);return vert+'_'+('IN' if inside else 'OUT')
+          bat['ZONE6']=[zone_bucket(r) for r in bat.itertuples(index=False)]
+          b14=[]
+          for bid in line.BATTER_ID.astype(int):
+            for zb,d in bat[bat.batter==bid].groupby('ZONE6'):
+              if zb=='UNKNOWN':continue
+              m=metrics(d);b14.append({'BATTER_ID':bid,'BATTER':name[bid],'ZONE':zb,**m,'STABILITY':'STABLE' if m['PITCHES']>=100 else ('LIMITED' if m['PITCHES']>=40 else 'SMALL')})
+          b14=pd.DataFrame(b14);b14.to_csv(OUT/'B14_zone_matrix.csv',index=False)
+          zone_summary=[]
+          for bid,d in b14.groupby('BATTER_ID'):
+            dd=d[d.PITCHES>=20].copy();damage=dd.sort_values(['XWOBA','WOBA'],ascending=False).head(1);vuln=dd.sort_values(['XWOBA','WOBA'],ascending=True).head(1)
+            zone_summary.append({'BATTER_ID':bid,'BATTER':name[int(bid)],'DAMAGE_ZONE':damage.ZONE.iloc[0] if len(damage) else 'NA','DAMAGE_XWOBA':damage.XWOBA.iloc[0] if len(damage) else np.nan,'VULNERABLE_ZONE':vuln.ZONE.iloc[0] if len(vuln) else 'NA','VULNERABLE_XWOBA':vuln.XWOBA.iloc[0] if len(vuln) else np.nan})
+          pd.DataFrame(zone_summary).to_csv(OUT/'B14_damage_vulnerable_zones.csv',index=False)
+
+          # B15 exact counts and leverage groups.
+          def lev(b,s):
+            c=f'{int(b)}-{int(s)}'
+            if c in {'1-0','2-0','2-1','3-0','3-1'}:return 'BATTER_AHEAD'
+            if c in {'0-1','0-2','1-2'}:return 'PITCHER_AHEAD'
+            return 'EVEN_FULL'
+          b15=[]
+          for bid in line.BATTER_ID.astype(int):
+            d=bat[bat.batter==bid].copy();d['COUNT']=d.balls.astype(int).astype(str)+'-'+d.strikes.astype(int).astype(str);d['LEVERAGE']=[lev(b,s) for b,s in zip(d.balls,d.strikes)]
+            groups=[('COUNT',x,y) for x,y in d.groupby('COUNT')]+[('LEVERAGE',x,y) for x,y in d.groupby('LEVERAGE')]+[('SPECIAL','FIRST_PITCH',d[(d.balls==0)&(d.strikes==0)])]+[('SPECIAL','TWO_STRIKES',d[d.strikes==2])]
+            for typ,label,dd in groups:
+              m=metrics(dd);q=dd[dd.events.notna()];ev=q.events.astype(str);b15.append({'BATTER_ID':bid,'BATTER':name[bid],'GROUP_TYPE':typ,'GROUP':label,**m,'BB_PCT':100*safediv(ev.isin(BB).sum(),len(q)),'K_PCT':100*safediv(ev.isin(K).sum(),len(q))})
+          b15=pd.DataFrame(b15);b15.to_csv(OUT/'B15_count_matrix.csv',index=False)
+
+          # B19 exact historical BvP from pregame Statcast.
+          bvp=yp[yp.batter.isin(ids)].copy();b19=[];glog=[]
+          for bid in line.BATTER_ID.astype(int):
+            d=bvp[bvp.batter==bid].copy();q=d[d.events.notna()].copy();ev=q.events.astype(str);AB=int(ev.isin(AB_EV).sum());h=int(ev.isin(HIT).sum());d2=int((ev=='double').sum());d3=int((ev=='triple').sum());hr=int((ev=='home_run').sum());s1=h-d2-d3-hr;bb=int(ev.isin(BB).sum());hbp=int((ev=='hit_by_pitch').sum());k=int(ev.isin(K).sum());sf=int((ev=='sac_fly').sum());tb=s1+2*d2+3*d3+4*hr;w,x=woba_x(d);bbe=d[pd.to_numeric(d.launch_speed,errors='coerce').notna()];mix=d.pitch_type.astype(str).value_counts(normalize=True).mul(100).round(1).to_dict()
+            obp=safediv(h+bb+hbp,AB+bb+hbp+sf);slg=safediv(tb,AB)
+            b19.append({'BATTER_ID':bid,'BATTER':name[bid],'PA':len(q),'AB':AB,'H':h,'1B':s1,'2B':d2,'3B':d3,'HR':hr,'BB':bb,'HBP':hbp,'K':k,'AVG':safediv(h,AB),'OBP':obp,'SLG':slg,'OPS':(obp+slg) if pd.notna(obp) and pd.notna(slg) else np.nan,'WOBA':w,'XWOBA':x,'EV':pd.to_numeric(bbe.launch_speed,errors='coerce').mean(),'HARD_HIT_PCT':100*safediv((pd.to_numeric(bbe.launch_speed,errors='coerce')>=95).sum(),len(bbe)),'BARREL_PCT':100*safediv((pd.to_numeric(bbe.launch_speed_angle,errors='coerce')==6).sum(),len(bbe)),'PITCH_MIX':json.dumps(mix,sort_keys=True),'GAMES':d.game_pk.nunique(),'FIRST_DATE':str(d.game_date.min().date()) if len(d) else 'NO_SAMPLE','LAST_DATE':str(d.game_date.max().date()) if len(d) else 'NO_SAMPLE','NOTE':'BvP secundario; muestra descriptiva, no predictor autónomo.'})
+            for (dt,gpk),gg in q.groupby(['game_date','game_pk']):glog.append({'BATTER_ID':bid,'BATTER':name[bid],'DATE':str(pd.Timestamp(dt).date()),'GAME_PK':int(gpk),'PA':len(gg),'EVENTS':'|'.join(gg.events.astype(str).tolist())})
+          b19=pd.DataFrame(b19);b19.to_csv(OUT/'B19_bvp_full.csv',index=False);pd.DataFrame(glog).to_csv(OUT/'B19_bvp_gamelog.csv',index=False)
+
+          # B18 explicit 10-variable matchup matrix.
+          zsum=pd.DataFrame(zone_summary).set_index('BATTER_ID');bvpidx=b19.set_index('BATTER_ID');cm=compat.copy()
+          primary=shape.iloc[0];secondary=shape.iloc[1] if len(shape)>1 else shape.iloc[0]
+          b18=[]
+          for bid in line.BATTER_ID.astype(int):
+            d=bat[bat.batter==bid];m=metrics(d);q=d[d.events.notna()];ev=q.events.astype(str);bbpct=100*safediv(ev.isin(BB).sum(),len(q));xbhpct=100*safediv(ev.isin(XBH).sum(),len(q));cc=cm[cm.BATTER_ID==bid].sort_values('DELTA_XWOBA',ascending=False);best=cc.iloc[0] if len(cc) else None;worst=cc.iloc[-1] if len(cc) else None;zs=zsum.loc[bid];bv=bvpidx.loc[bid]
+            overlap='UNKNOWN'; yzone=metrics(yp[(pd.to_numeric(yp.zone,errors='coerce').isin(range(1,10)))])
+            if str(zs.DAMAGE_ZONE)!='NA':overlap=str(zs.DAMAGE_ZONE)
+            sample='DIRECT_BVP' if int(bv.PA)>=5 else ('SMALL_BVP' if int(bv.PA)>0 else 'NO_BVP')
+            prod=f"Elevar conteo (BB% {bbpct:.1f}), buscar {best.PITCH_TYPE if best is not None else 'mistake'} y zona {zs.DAMAGE_ZONE}; XBH/PA {xbhpct:.1f}%."
+            neut=f"Yesavage: {primary.PITCH_TYPE} {primary.USE_PCT:.1f}% + {secondary.PITCH_TYPE} {secondary.USE_PCT:.1f}%; atacar debilidad {worst.PITCH_TYPE if worst is not None else 'secundario'} y dos strikes."
+            b18.append({'ORDER':int(line.loc[line.BATTER_ID==bid,'ORDER'].iloc[0]),'BATTER_ID':bid,'BATTER':name[bid],'V1_HAND':str(d.stand.mode().iloc[0]) if len(d) else '', 'V2_SEASON_WOBA':m['WOBA'],'V3_SEASON_XWOBA':m['XWOBA'],'V4_BEST_PITCH_TYPE':best.PITCH_TYPE if best is not None else 'NA','V5_WORST_PITCH_TYPE':worst.PITCH_TYPE if worst is not None else 'NA','V6_WHIFF_PCT':m['WHIFF_PCT'],'V7_BB_PCT':bbpct,'V8_PRIMARY_SECONDARY':f"{primary.PITCH_TYPE}/{secondary.PITCH_TYPE}",'V9_DAMAGE_ZONE_OVERLAP':overlap,'V10_BVP_SAMPLE':sample,'BVP_PA':int(bv.PA),'BVP_OPS':bv.OPS,'ROUTE_PRODUCTION':prod,'ROUTE_NEUTRALIZATION':neut,'SAMPLE_SUFFICIENCY':'MEDIUM' if m['PA']>=150 else 'LIMITED','CUTOFF':'2026-07-23 23:59 ET','NOTE':'Cruce descriptivo/inferencial; sin pick ni certeza causal.'})
+          b18=pd.DataFrame(b18).sort_values('ORDER');b18.to_csv(OUT/'B18_matchup_matrix.csv',index=False)
+
+          qa={'game_pk':GAME_PK,'cutoff':CUTOFF,'official_lineup_rows':len(line),'bos_pregame_games':len(gpks),'u10_games':u10.game_pk.nunique(),'season_batter_coverage':bat.batter.nunique(),'yesavage_id':yid,'yesavage_games':yp.game_pk.nunique(),'yesavage_pitches':len(yp),'B11_rows':len(b11),'B13_shape_rows':len(shape),'B13_compat_rows':len(compat),'B14_rows':len(b14),'B15_rows':len(b15),'B18_rows':len(b18),'B19_rows':len(b19),'B19_total_PA':int(b19.PA.sum()),'status':'PASS'}
+          if qa['official_lineup_rows']!=9 or qa['u10_games']!=10 or qa['season_batter_coverage']!=9 or qa['B18_rows']!=9 or qa['B19_rows']!=9:raise RuntimeError(str(qa))
+          (OUT/'qa_final.json').write_text(json.dumps(qa,indent=2),encoding='utf-8')
+          md=['# BOS V14 — cierre granular B11/B13-B15/B18/B19','',f"QA: **PASS** — Game {GAME_PK}; corte pregame {CUTOFF}; lineup 9/9; U10 10/10; temporada Boston {len(gpks)} juegos; Yesavage {yp.game_pk.nunique()} juegos / {len(yp)} lanzamientos.",'','## B11',b11.to_markdown(index=False),'','## B13 shape',shape.to_markdown(index=False),'','## B13 compatibility',compat.to_markdown(index=False),'','## B14 zones',b14.to_markdown(index=False),'','## B15 counts',b15.to_markdown(index=False),'','## B18 matchup',b18.to_markdown(index=False),'','## B19 BvP',b19.to_markdown(index=False)]
+          (OUT/'BOS_V14_GRANULAR.md').write_text('\n'.join(md),encoding='utf-8')
+          print(json.dumps(qa,indent=2));print(shape.to_string(index=False));print(b18.to_string(index=False));print(b19.to_string(index=False))
+          PY
+      - name: Commit outputs
+        if: always()
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/bos_v14_granular || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'BOS V14: close granular offense blocks'; git push; fi
