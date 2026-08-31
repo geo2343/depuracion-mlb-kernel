@@ -1,0 +1,277 @@
+name: CLE V1.6 Close Final Matrices
+
+on:
+  push:
+    paths:
+      - '.github/workflows/cle-v16-close-three-matrices.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  reconstruct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests pandas numpy tabulate pybaseball
+      - name: Reconstruct F7 F9 F10
+        run: |
+          python - <<'PY'
+          import json,time,math
+          from pathlib import Path
+          from concurrent.futures import ThreadPoolExecutor,as_completed
+          from datetime import date,timedelta
+          import requests,pandas as pd,numpy as np
+
+          OUT=Path('runtime/cle_v16_final'); OUT.mkdir(parents=True,exist_ok=True)
+          TEAM_ID=114; TEAM_ABBR='CLE'
+          periods={
+            '2025':('2025-03-27','2025-09-28',162,643,649),
+            '2026_CUTOFF':('2026-03-26','2026-07-21',102,410,410),
+          }
+          headers={'User-Agent':'Mozilla/5.0 CLE-V1.6-final/1.0'}
+
+          def getj(url,params=None,tries=8):
+            last=None
+            for i in range(tries):
+              try:
+                r=requests.get(url,params=params,headers=headers,timeout=90); r.raise_for_status(); return r.json()
+              except Exception as e:
+                last=e; time.sleep(1.0*(i+1))
+            raise last
+
+          teamsj=getj('https://statsapi.mlb.com/api/v1/teams',{'sportId':1})
+          team_meta={int(t['id']):{'name':t['name'],'abbr':t.get('abbreviation',t['name'])} for t in teamsj['teams']}
+
+          def gamelog(year,end):
+            j=getj(f'https://statsapi.mlb.com/api/v1/teams/{TEAM_ID}/stats',{'stats':'gameLog','group':'hitting','season':year,'gameType':'R'})
+            rows=[]
+            for s in j.get('stats',[{}])[0].get('splits',[]):
+              dt=s.get('date'); pk=(s.get('game') or {}).get('gamePk')
+              if not dt or not pk or dt>end: continue
+              st=s.get('stat') or {}
+              rows.append({'DATE':dt,'GAME_PK':int(pk),'RS_GAMELOG':int(st.get('runs',0))})
+            return pd.DataFrame(rows).drop_duplicates('GAME_PK').sort_values(['DATE','GAME_PK']).reset_index(drop=True)
+
+          universes=[]
+          for label,(start,end,eg,ers,era) in periods.items():
+            df=gamelog(int(label[:4]),end)
+            if len(df)!=eg: raise RuntimeError(f'{label}: gameLog G {len(df)} != {eg}')
+            if int(df.RS_GAMELOG.sum())!=ers: raise RuntimeError(f'{label}: RS {int(df.RS_GAMELOG.sum())} != {ers}')
+            df['PERIOD']=label; universes.append(df)
+          universe=pd.concat(universes,ignore_index=True)
+          if len(universe)!=264 or universe.GAME_PK.nunique()!=264: raise RuntimeError('universe uniqueness failed')
+          universe.to_csv(OUT/'cle_264_gamelog_universe.csv',index=False)
+
+          feeds={}
+          def fetch_feed(pk): return int(pk),getj(f'https://statsapi.mlb.com/api/v1.1/game/{int(pk)}/feed/live')
+          with ThreadPoolExecutor(max_workers=14) as ex:
+            futs=[ex.submit(fetch_feed,pk) for pk in universe.GAME_PK.tolist()]
+            for i,f in enumerate(as_completed(futs),1):
+              pk,j=f.result(); feeds[pk]=j
+              if i%40==0: print('feeds',i,'/',len(futs))
+          if len(feeds)!=264: raise RuntimeError(f'feeds {len(feeds)} !=264')
+
+          # Fase 5 criterion reproduced exactly: RA/G ranking, lower is stronger.
+          def league_ra_rank(start,end):
+            j=getj('https://statsapi.mlb.com/api/v1/schedule',{'sportId':1,'gameTypes':'R','startDate':start,'endDate':end,'hydrate':'team'})
+            seen={}; agg={}
+            for d in j.get('dates',[]):
+              for g in d.get('games',[]):
+                if g.get('gameType')!='R' or g.get('status',{}).get('abstractGameState')!='Final': continue
+                pk=int(g['gamePk'])
+                # schedule can repeat postponed/rescheduled records; gamePk is canonical.
+                if pk in seen: continue
+                seen[pk]=1
+                a=g['teams']['away']; h=g['teams']['home']
+                if a.get('score') is None or h.get('score') is None: continue
+                aid=int(a['team']['id']); hid=int(h['team']['id']); ar=int(a['score']); hr=int(h['score'])
+                for tid,ra in [(aid,hr),(hid,ar)]:
+                  x=agg.setdefault(tid,[0,0]);x[0]+=1;x[1]+=ra
+            rows=[]
+            for tid,(gg,ra) in agg.items():
+              if tid in team_meta and gg: rows.append({'TEAM_ID':tid,'TEAM':team_meta[tid]['name'],'G':gg,'RA':ra,'RA_G':ra/gg})
+            rk=pd.DataFrame(rows).sort_values(['RA_G','RA','TEAM']).reset_index(drop=True)
+            if len(rk)!=30: raise RuntimeError(f'RA/G ranking has {len(rk)} teams')
+            rk['PREVENTION_RANK']=np.arange(1,31)
+            rk['OPP_STRENGTH']=np.where(rk.PREVENTION_RANK<=10,'FUERTE',np.where(rk.PREVENTION_RANK<=20,'MEDIO','DEBIL'))
+            return rk
+
+          rankings={}
+          for label,(start,end,eg,ers,era) in periods.items():
+            rk=league_ra_rank(start,end); rk.to_csv(OUT/f'ra_g_rank_{label}.csv',index=False)
+            rankings[label]={int(r.TEAM_ID):r.OPP_STRENGTH for r in rk.itertuples()}
+
+          # F7 + F9 game reconstruction and TTO.
+          games=[]; off_run_trace=[]; tto_rows=[]
+          for u in universe.itertuples(index=False):
+            pk=int(u.GAME_PK); j=feeds[pk]; gd=j['gameData']; ld=j['liveData']
+            homeid=int(gd['teams']['home']['id']); awayid=int(gd['teams']['away']['id'])
+            cle_home=homeid==TEAM_ID; bat_side='home' if cle_home else 'away'; opp_side='away' if cle_home else 'home'
+            oppid=awayid if cle_home else homeid; venue='HOME' if cle_home else 'AWAY'
+            ls=ld['linescore']; rs=int((ls.get('teams',{}).get(bat_side,{}) or {}).get('runs',u.RS_GAMELOG) or 0)
+            ra=int((ls.get('teams',{}).get(opp_side,{}) or {}).get('runs',0) or 0)
+            if rs!=int(u.RS_GAMELOG): raise RuntimeError(f'{pk}: linescore RS {rs} != gameLog {u.RS_GAMELOG}')
+            cle_inns=[]; opp_inns=[]
+            for inn in ls.get('innings',[]):
+              n=int(inn.get('num',0) or 0)
+              cr=(inn.get(bat_side,{}) or {}).get('runs'); rr=(inn.get(opp_side,{}) or {}).get('runs')
+              if cr is not None: cle_inns.append((n,int(cr)))
+              if rr is not None: opp_inns.append((n,int(rr)))
+
+            oppbox=ld['boxscore']['teams'][opp_side]; opp_plist=[int(x) for x in oppbox.get('pitchers',[])]
+            opp_starters=[]
+            for key,p in oppbox.get('players',{}).items():
+              pst=(p.get('stats',{}).get('pitching') or {})
+              if int(pst.get('gamesStarted',0) or 0)==1:
+                pid=(p.get('person') or {}).get('id')
+                if pid is not None: opp_starters.append(int(pid))
+            opp_starter=opp_starters[0] if len(opp_starters)==1 else (opp_plist[0] if opp_plist else None)
+            if opp_starter is None: raise RuntimeError(f'{pk}: no opponent starter')
+
+            # Offensive runs by responsible pitcher.
+            sr=br=ur=0; pset=set(opp_plist); cle_half='bottom' if cle_home else 'top'
+            for p in ld['plays']['allPlays']:
+              if p.get('about',{}).get('halfInning')!=cle_half: continue
+              for rn in p.get('runners',[]):
+                if rn.get('movement',{}).get('end')!='score': continue
+                det=rn.get('details',{}); rp=det.get('responsiblePitcher'); rpid=rp.get('id') if isinstance(rp,dict) else None
+                if rpid is None: ur+=1; cls='UNRESOLVED'
+                elif int(rpid)==opp_starter: sr+=1; cls='STARTER'
+                elif int(rpid) in pset: br+=1; cls='BULLPEN'
+                else: ur+=1; cls='UNRESOLVED'
+                off_run_trace.append({'PERIOD':u.PERIOD,'DATE':u.DATE,'GAME_PK':pk,'RESPONSIBLE_PITCHER_ID':rpid,'OPP_STARTER_ID':opp_starter,'CLASS':cls,'INNING':p.get('about',{}).get('inning')})
+            if sr+br+ur!=rs: raise RuntimeError(f'{pk}: offense attribution {sr+br+ur} != RS {rs}')
+
+            # Cleveland starter and times-through-order table.
+            clebox=ld['boxscore']['teams'][bat_side]
+            cle_plist=[int(x) for x in clebox.get('pitchers',[])]
+            cle_starters=[]
+            for key,p in clebox.get('players',{}).items():
+              pst=(p.get('stats',{}).get('pitching') or {})
+              if int(pst.get('gamesStarted',0) or 0)==1:
+                pid=(p.get('person') or {}).get('id')
+                if pid is not None: cle_starters.append(int(pid))
+            cle_starter=cle_starters[0] if len(cle_starters)==1 else (cle_plist[0] if cle_plist else None)
+            if cle_starter is None: raise RuntimeError(f'{pk}: no CLE starter')
+            opp_half='top' if cle_home else 'bottom'; pa_idx=0
+            for p in ld['plays']['allPlays']:
+              if p.get('about',{}).get('halfInning')!=opp_half: continue
+              pid=(p.get('matchup',{}).get('pitcher') or {}).get('id')
+              if pid is None or int(pid)!=cle_starter: continue
+              pa_idx+=1; tto=1+(pa_idx-1)//9; bucket=str(tto) if tto<=3 else '4+'
+              ev=(p.get('result',{}).get('eventType') or '').lower(); runs=0
+              for rn in p.get('runners',[]):
+                if rn.get('movement',{}).get('end')=='score': runs+=1
+              tto_rows.append({'PERIOD':u.PERIOD,'DATE':u.DATE,'GAME_PK':pk,'STARTER_ID':cle_starter,'TTO':bucket,'TBF':1,
+                               'H':int(ev in {'single','double','triple','home_run'}),'HR':int(ev=='home_run'),'BB':int(ev in {'walk','intent_walk'}),'HBP':int(ev=='hit_by_pitch'),'SO':int(ev in {'strikeout','strikeout_double_play'}),'R_ON_PLAY':runs})
+
+            games.append({'PERIOD':u.PERIOD,'DATE':u.DATE,'GAME_PK':pk,'VENUE':venue,'OPP_ID':oppid,'OPP':team_meta[oppid]['name'],'OPP_STRENGTH':rankings[u.PERIOD][oppid],
+                          'RS':rs,'RA':ra,'R_1_3':sum(r for n,r in cle_inns if n<=3),'R_4_6':sum(r for n,r in cle_inns if 4<=n<=6),'R_7_PLUS':sum(r for n,r in cle_inns if n>=7),
+                          'RA_1_3':sum(r for n,r in opp_inns if n<=3),'RA_4_6':sum(r for n,r in opp_inns if 4<=n<=6),'RA_7_PLUS':sum(r for n,r in opp_inns if n>=7),
+                          'OFF_HALF_INNINGS':len(cle_inns),'HALF_INNINGS_3PLUS':sum(r>=3 for _,r in cle_inns),'GAME_HAS_3PLUS':int(any(r>=3 for _,r in cle_inns)),
+                          'STARTER_RUNS':sr,'BULLPEN_RUNS':br,'UNRESOLVED_RUNS':ur,'CLE_STARTER_ID':cle_starter})
+
+          games=pd.DataFrame(games); trace=pd.DataFrame(off_run_trace); tto=pd.DataFrame(tto_rows)
+          games.to_csv(OUT/'cle_264_game_reconstruction.csv',index=False); trace.to_csv(OUT/'cle_1053_offensive_run_trace.csv',index=False); tto.to_csv(OUT/'cle_starter_tto_pa.csv',index=False)
+          for label,(start,end,eg,ers,era) in periods.items():
+            d=games[games.PERIOD==label]
+            if len(d)!=eg or int(d.RS.sum())!=ers or int(d.RA.sum())!=era: raise RuntimeError(f'{label}: G/RS/RA {len(d)}/{d.RS.sum()}/{d.RA.sum()} expected {eg}/{ers}/{era}')
+          if int(games.UNRESOLVED_RUNS.sum())!=0: raise RuntimeError(f'F7 unresolved offensive runs {int(games.UNRESOLVED_RUNS.sum())}')
+          if len(trace)!=1053: raise RuntimeError(f'offensive run trace {len(trace)} !=1053')
+
+          f7=[]
+          for (period,strength,venue),d in games.groupby(['PERIOD','OPP_STRENGTH','VENUE']):
+            n=len(d); hi=int(d.HALF_INNINGS_3PLUS.sum()); htot=int(d.OFF_HALF_INNINGS.sum())
+            f7.append({'PERIOD':period,'OPP_STRENGTH':strength,'VENUE':venue,'G':n,'RS':int(d.RS.sum()),'R_G':round(float(d.RS.mean()),3),
+                       'R_1_3':int(d.R_1_3.sum()),'R_1_3_G':round(float(d.R_1_3.mean()),3),'R_4_6':int(d.R_4_6.sum()),'R_4_6_G':round(float(d.R_4_6.mean()),3),'R_7_PLUS':int(d.R_7_PLUS.sum()),'R_7_PLUS_G':round(float(d.R_7_PLUS.mean()),3),
+                       'STARTER_RUNS':int(d.STARTER_RUNS.sum()),'STARTER_RUNS_G':round(float(d.STARTER_RUNS.mean()),3),'BULLPEN_RUNS':int(d.BULLPEN_RUNS.sum()),'BULLPEN_RUNS_G':round(float(d.BULLPEN_RUNS.mean()),3),
+                       'OFF_HALF_INNINGS':htot,'HALF_INNINGS_3PLUS':hi,'HALF_INNINGS_3PLUS_PCT':round(100*hi/htot,1),'GAMES_WITH_3PLUS':int(d.GAME_HAS_3PLUS.sum()),'GAMES_WITH_3PLUS_PCT':round(100*float(d.GAME_HAS_3PLUS.mean()),1)})
+          f7=pd.DataFrame(f7).sort_values(['PERIOD','OPP_STRENGTH','VENUE']); f7.to_csv(OUT/'phase7_integral_matrix.csv',index=False)
+
+          tto_agg=tto.groupby(['PERIOD','TTO'],as_index=False).agg({'TBF':'sum','H':'sum','HR':'sum','BB':'sum','HBP':'sum','SO':'sum','R_ON_PLAY':'sum'})
+          order={'1':1,'2':2,'3':3,'4+':4}; tto_agg['ORDER']=tto_agg.TTO.map(order); tto_agg=tto_agg.sort_values(['PERIOD','ORDER']).drop(columns='ORDER')
+          tto_agg.to_csv(OUT/'phase9_times_through_order.csv',index=False)
+          thirds=games.groupby('PERIOD',as_index=False).agg(G=('GAME_PK','size'),RA=('RA','sum'),RA_1_3=('RA_1_3','sum'),RA_4_6=('RA_4_6','sum'),RA_7_PLUS=('RA_7_PLUS','sum'))
+          thirds['CHECK']=thirds.RA_1_3+thirds.RA_4_6+thirds.RA_7_PLUS; thirds.to_csv(OUT/'phase9_runs_allowed_thirds.csv',index=False)
+          if not (thirds.RA==thirds.CHECK).all(): raise RuntimeError('RA thirds do not reconcile')
+
+          # F10 Statcast pitch-family splits. Team-level, pitch-weighted and PA-weighted.
+          from pybaseball import statcast
+          def fetch_statcast_period(start,end):
+            # Monthly-ish chunks reduce Savant timeout risk. Team parameter limits traffic; inning context identifies CLE batting side.
+            s=date.fromisoformat(start); e=date.fromisoformat(end); chunks=[]
+            cur=s
+            while cur<=e:
+              ce=min(cur+timedelta(days=30),e)
+              last=None
+              for attempt in range(5):
+                try:
+                  x=statcast(cur.isoformat(),ce.isoformat(),team=TEAM_ABBR,verbose=False,parallel=True)
+                  chunks.append(x); last=None; break
+                except Exception as ex:
+                  last=ex; time.sleep(4*(attempt+1))
+              if last is not None: raise last
+              cur=ce+timedelta(days=1)
+            z=pd.concat(chunks,ignore_index=True) if chunks else pd.DataFrame()
+            if z.empty: raise RuntimeError('Statcast returned empty data')
+            # Keep only pitches where Cleveland is batting.
+            home=z.home_team.astype(str).eq(TEAM_ABBR); away=z.away_team.astype(str).eq(TEAM_ABBR)
+            bot=z.inning_topbot.astype(str).str.lower().eq('bot'); top=z.inning_topbot.astype(str).str.lower().eq('top')
+            z=z[(home&bot)|(away&top)].copy()
+            return z
+
+          families={'FASTBALL':{'FF','SI','FC'},'BREAKING':{'CU','KC','CS','SL','ST','SV'},'OFFSPEED':{'CH','FS','FO','SC'}}
+          swing_desc={'swinging_strike','swinging_strike_blocked','foul','foul_tip','hit_into_play','hit_into_play_no_out','hit_into_play_score'}
+          whiff_desc={'swinging_strike','swinging_strike_blocked'}
+          hit_events={'single':1,'double':1,'triple':1,'home_run':1}
+          f10=[]; f10_raw=[]
+          for label,(start,end,eg,ers,era) in periods.items():
+            z=fetch_statcast_period(start,end)
+            z.to_csv(OUT/f'statcast_cle_batting_{label}.csv',index=False)
+            for fam,codes in families.items():
+              d=z[z.pitch_type.astype(str).isin(codes)].copy()
+              if d.empty: raise RuntimeError(f'{label}/{fam}: no pitches')
+              desc=d.description.astype(str)
+              swings=int(desc.isin(swing_desc).sum()); whiffs=int(desc.isin(whiff_desc).sum()); pitches=len(d)
+              # Terminal PA pitch: events non-null.
+              pa=d[d.events.notna()].copy(); ev=pa.events.astype(str)
+              AB=int(ev.isin(['single','double','triple','home_run','field_out','force_out','grounded_into_double_play','field_error','fielders_choice','fielders_choice_out','strikeout','strikeout_double_play','double_play','triple_play']).sum())
+              H=int(ev.isin(['single','double','triple','home_run']).sum()); doubles=int((ev=='double').sum()); triples=int((ev=='triple').sum()); hr=int((ev=='home_run').sum())
+              BB=int(ev.isin(['walk','intent_walk']).sum()); HBP=int((ev=='hit_by_pitch').sum()); SF=int((ev=='sac_fly').sum())
+              tb=H+doubles+2*triples+3*hr
+              ba=H/AB if AB else np.nan; obp=(H+BB+HBP)/(AB+BB+HBP+SF) if (AB+BB+HBP+SF) else np.nan; slg=tb/AB if AB else np.nan
+              wv=pd.to_numeric(pa.woba_value,errors='coerce'); wd=pd.to_numeric(pa.woba_denom,errors='coerce'); woba=float(wv.sum()/wd.sum()) if wd.sum()>0 else np.nan
+              est=pd.to_numeric(pa.estimated_woba_using_speedangle,errors='coerce'); xnum=pd.Series(np.where(est.notna(),est,wv),index=pa.index,dtype='float64'); xwoba=float(xnum.fillna(0).sum()/wd.sum()) if wd.sum()>0 else np.nan
+              drv=pd.to_numeric(d.delta_run_exp,errors='coerce'); run_value=float(drv.fillna(0).sum())
+              f10.append({'PERIOD':label,'FAMILY':fam,'PITCHES':pitches,'SWINGS':swings,'WHIFFS':whiffs,'WHIFF_PCT':round(100*whiffs/swings,2) if swings else None,'PA_TERMINAL':len(pa),'AB':AB,'H':H,'2B':doubles,'3B':triples,'HR':hr,'BB':BB,'HBP':HBP,'SF':SF,'BA':round(ba,3),'OBP':round(obp,3),'SLG':round(slg,3),'wOBA':round(woba,3),'xwOBA':round(xwoba,3),'RUN_VALUE':round(run_value,1)})
+              f10_raw.append({'PERIOD':label,'FAMILY':fam,'PITCHES':pitches,'PA_TERMINAL':len(pa)})
+          f10=pd.DataFrame(f10); f10.to_csv(OUT/'phase10_pitch_family_splits.csv',index=False)
+          if len(f10)!=6: raise RuntimeError(f'F10 rows {len(f10)} !=6')
+
+          qa={
+            'game_counts':games.groupby('PERIOD').size().to_dict(),
+            'rs_sums':games.groupby('PERIOD').RS.sum().astype(int).to_dict(),
+            'ra_sums':games.groupby('PERIOD').RA.sum().astype(int).to_dict(),
+            'offensive_run_trace_rows':len(trace),
+            'unresolved_offensive_runs':int(games.UNRESOLVED_RUNS.sum()),
+            'f7_rows':len(f7),'f9_tto_rows':len(tto_agg),'f10_rows':len(f10),
+            'ra_thirds_reconciled':bool((thirds.RA==thirds.CHECK).all()),
+            'status':'PASS'
+          }
+          (OUT/'qa.json').write_text(json.dumps(qa,indent=2),encoding='utf-8')
+          md=['# CLE V1.6 — CIERRE DE F7 / F9 / F10','',f"QA: **PASS** — 264 juegos (162+102); RS 643/410; RA 649/410; 1,053 carreras ofensivas trazadas; 0 sin responsable.",'','## Fase 7 — matriz integral','',f7.to_markdown(index=False),'','## Fase 9 — veces enfrentando el lineup','',tto_agg.to_markdown(index=False),'','### Carreras permitidas por tercios','',thirds.to_markdown(index=False),'','## Fase 10 — familias de lanzamiento ponderadas','',f10.to_markdown(index=False),'','## Método','- F7: universo MLB gameLog, linescore y PBP oficial. Fuerza del rival por el mismo criterio rector RA/G: puestos 1–10 Fuerte, 11–20 Medio, 21–30 Débil.','- Local/visitante, tercios, entradas de 3+ y abridor/bullpen salen de cada gamePk. Corredores heredados se atribuyen por responsiblePitcher.','- F9 TTO: solo apariciones enfrentadas por el abridor de Cleveland; TTO 1=PA 1–9, 2=10–18, 3=19–27, 4+=28+. Carreras por tercios se cuadran por linescore contra RA total.','- F10: Statcast pitch-level; familias FF/SI/FC, CU/KC/CS/SL/ST/SV, CH/FS/FO/SC. Whiff% ponderado por swings; BA/OBP/SLG/wOBA/xwOBA por PA terminal; run value=sum(delta_run_exp). No se promedian porcentajes individuales.']
+          (OUT/'CLE_V16_NOTION_BLOCK.md').write_text('\n'.join(md),encoding='utf-8')
+          print(f7.to_string(index=False)); print(tto_agg.to_string(index=False)); print(thirds.to_string(index=False)); print(f10.to_string(index=False)); print(json.dumps(qa,indent=2))
+          PY
+      - name: Commit Cleveland outputs
+        if: always()
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/cle_v16_final || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'CLE V1.6: close F7 F9 F10 matrices'; git push; fi
