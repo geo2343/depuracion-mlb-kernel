@@ -1,0 +1,32 @@
+{
+  "core_status": "PASS",
+  "games": {
+    "2024": 162,
+    "2025": 162,
+    "2026_CUTOFF": 101
+  },
+  "rs": {
+    "2024": 643,
+    "2025": 733,
+    "2026_CUTOFF": 453
+  },
+  "ra": {
+    "2024": 764,
+    "2025": 817,
+    "2026_CUTOFF": 565
+  },
+  "run_trace_rows": 1829,
+  "unresolved_runs": 0,
+  "savant_offense_game_coverage": {
+    "2024": 162,
+    "2025": 162,
+    "2026_CUTOFF": 101
+  },
+  "f7_rows": 18,
+  "f10_rows": 9,
+  "rotation_bullpen_2024_rows": 2,
+  "defense_periods": 3,
+  "frv_reconciled": true,
+  "catching_components_reconciled": true,
+  "team_research_status": "PASS"
+}
