@@ -1,0 +1,127 @@
+name: CLE V1.6 F10 R2 GamePk
+
+on:
+  push:
+    paths:
+      - '.github/workflows/cle-v16-f10-r2-gamepk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  f10:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests pandas numpy tabulate
+      - name: Rebuild F10 from canonical Cleveland gamePk set
+        run: |
+          python - <<'PY'
+          import io,json,time
+          from pathlib import Path
+          from concurrent.futures import ThreadPoolExecutor,as_completed
+          import requests,pandas as pd,numpy as np
+
+          OUT=Path('runtime/cle_v16_final'); TEAM='CLE'
+          uni=pd.read_csv(OUT/'cle_264_gamelog_universe.csv')
+          if len(uni)!=264 or uni.GAME_PK.nunique()!=264: raise RuntimeError('canonical universe missing or invalid')
+          games=pd.read_csv(OUT/'cle_264_game_reconstruction.csv')
+          if len(games)!=264: raise RuntimeError('game reconstruction missing')
+          expected={'2025':(162,643,649),'2026_CUTOFF':(102,410,410)}
+          for p,(g,rs,ra) in expected.items():
+            d=games[games.PERIOD==p]
+            if len(d)!=g or int(d.RS.sum())!=rs or int(d.RA.sum())!=ra: raise RuntimeError(f'{p} F7/F9 base no longer reconciles')
+
+          headers={'User-Agent':'Mozilla/5.0 CLE-V1.6-F10-R2/1.0'}
+          def one(pk):
+            url=f'https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk={int(pk)}'
+            last=None
+            for i in range(7):
+              try:
+                r=requests.get(url,headers=headers,timeout=90); r.raise_for_status()
+                if not r.text.strip(): raise RuntimeError('empty csv')
+                df=pd.read_csv(io.StringIO(r.text))
+                if df.empty: raise RuntimeError('empty dataframe')
+                return int(pk),df
+              except Exception as e:
+                last=e; time.sleep(1.5*(i+1))
+            raise last
+
+          allframes=[]
+          with ThreadPoolExecutor(max_workers=12) as ex:
+            futs=[ex.submit(one,pk) for pk in uni.GAME_PK.tolist()]
+            for i,f in enumerate(as_completed(futs),1):
+              pk,df=f.result(); allframes.append(df)
+              if i%40==0: print('savant games',i,'/264')
+          z=pd.concat(allframes,ignore_index=True)
+          z['game_pk']=pd.to_numeric(z.game_pk,errors='coerce').astype('Int64')
+          mp=uni.set_index('GAME_PK')['PERIOD'].to_dict(); z['PERIOD']=z.game_pk.map(mp)
+          if z.PERIOD.isna().any(): raise RuntimeError('Statcast rows outside canonical universe')
+
+          home=z.home_team.astype(str).eq(TEAM); away=z.away_team.astype(str).eq(TEAM)
+          bot=z.inning_topbot.astype(str).str.lower().isin(['bot','bottom']); top=z.inning_topbot.astype(str).str.lower().eq('top')
+          bat=z[(home&bot)|(away&top)].copy()
+          if bat.empty: raise RuntimeError('CLE batting filter empty')
+          # Every canonical game must contribute at least one CLE batting pitch.
+          cov=bat.groupby('PERIOD').game_pk.nunique().to_dict()
+          if cov.get('2025')!=162 or cov.get('2026_CUTOFF')!=102: raise RuntimeError(f'game coverage {cov}')
+          bat.to_csv(OUT/'statcast_cle_batting_canonical_264.csv',index=False)
+
+          families={'FASTBALL':{'FF','SI','FC'},'BREAKING':{'CU','KC','CS','SL','ST','SV'},'OFFSPEED':{'CH','FS','FO','SC'}}
+          swing_desc={'swinging_strike','swinging_strike_blocked','foul','foul_tip','hit_into_play','hit_into_play_no_out','hit_into_play_score'}
+          whiff_desc={'swinging_strike','swinging_strike_blocked'}
+          ab_events={'single','double','triple','home_run','field_out','force_out','grounded_into_double_play','field_error','fielders_choice','fielders_choice_out','strikeout','strikeout_double_play','double_play','triple_play'}
+          out=[]
+          for period in ['2025','2026_CUTOFF']:
+            zz=bat[bat.PERIOD==period]
+            for fam,codes in families.items():
+              d=zz[zz.pitch_type.astype(str).isin(codes)].copy()
+              if d.empty: raise RuntimeError(f'{period}/{fam}: no pitches')
+              desc=d.description.astype(str); swings=int(desc.isin(swing_desc).sum()); whiffs=int(desc.isin(whiff_desc).sum())
+              pa=d[d.events.notna()].copy(); ev=pa.events.astype(str)
+              AB=int(ev.isin(ab_events).sum()); H=int(ev.isin(['single','double','triple','home_run']).sum()); d2=int((ev=='double').sum()); d3=int((ev=='triple').sum()); hr=int((ev=='home_run').sum())
+              BB=int(ev.isin(['walk','intent_walk']).sum()); HBP=int((ev=='hit_by_pitch').sum()); SF=int((ev=='sac_fly').sum()); tb=H+d2+2*d3+3*hr
+              ba=H/AB if AB else np.nan; obp=(H+BB+HBP)/(AB+BB+HBP+SF) if (AB+BB+HBP+SF) else np.nan; slg=tb/AB if AB else np.nan
+              wv=pd.to_numeric(pa.woba_value,errors='coerce'); wd=pd.to_numeric(pa.woba_denom,errors='coerce')
+              woba=float(wv.fillna(0).sum()/wd.fillna(0).sum()) if wd.fillna(0).sum()>0 else np.nan
+              est=pd.to_numeric(pa.estimated_woba_using_speedangle,errors='coerce')
+              # Statcast expected value on batted balls; BB/HBP and non-BIP retain actual linear weight; outs/K are zero.
+              xcomp=wv.copy(); xcomp.loc[est.notna()]=est.loc[est.notna()]
+              xwoba=float(xcomp.fillna(0).sum()/wd.fillna(0).sum()) if wd.fillna(0).sum()>0 else np.nan
+              drv=pd.to_numeric(d.delta_run_exp,errors='coerce'); rv=float(drv.fillna(0).sum())
+              out.append({'PERIOD':period,'FAMILY':fam,'PITCHES':len(d),'SWINGS':swings,'WHIFFS':whiffs,'WHIFF_PCT':round(100*whiffs/swings,2) if swings else None,'PA_TERMINAL':len(pa),'AB':AB,'H':H,'2B':d2,'3B':d3,'HR':hr,'BB':BB,'HBP':HBP,'SF':SF,'BA':round(ba,3),'OBP':round(obp,3),'SLG':round(slg,3),'wOBA':round(woba,3),'xwOBA':round(xwoba,3),'RUN_VALUE':round(rv,1)})
+          f10=pd.DataFrame(out)
+          if len(f10)!=6: raise RuntimeError(f'F10 rows {len(f10)} !=6')
+          if (f10.PITCHES<=0).any() or (f10.PA_TERMINAL<=0).any(): raise RuntimeError('F10 empty denominator')
+          f10.to_csv(OUT/'phase10_pitch_family_splits.csv',index=False)
+
+          # Final cross-block QA.
+          f7=pd.read_csv(OUT/'phase7_integral_matrix.csv'); tto=pd.read_csv(OUT/'phase9_times_through_order.csv'); thirds=pd.read_csv(OUT/'phase9_runs_allowed_thirds.csv')
+          qa={
+            'game_counts':games.groupby('PERIOD').size().to_dict(),
+            'rs_sums':games.groupby('PERIOD').RS.sum().astype(int).to_dict(),
+            'ra_sums':games.groupby('PERIOD').RA.sum().astype(int).to_dict(),
+            'offensive_run_trace_rows':1053,
+            'unresolved_offensive_runs':int(games.UNRESOLVED_RUNS.sum()),
+            'f7_rows':len(f7),'f9_tto_rows':len(tto),'f10_rows':len(f10),
+            'statcast_game_coverage':cov,
+            'ra_thirds_reconciled':bool((thirds.RA==thirds.CHECK).all()),
+            'status':'PASS'
+          }
+          if qa['unresolved_offensive_runs']!=0 or not qa['ra_thirds_reconciled']: raise RuntimeError(qa)
+          (OUT/'qa.json').write_text(json.dumps(qa,indent=2),encoding='utf-8')
+          md=['# CLE V1.6 — CIERRE F7 / F9 / F10','',f"QA: **PASS** — 264 juegos; RS 643/410; RA 649/410; 1,053 carreras ofensivas trazadas; Statcast cubre 162/102 juegos; 0 huecos.",'','## Fase 7 — matriz integral','',f7.to_markdown(index=False),'','## Fase 9 — veces enfrentando el lineup','',tto.to_markdown(index=False),'','### Carreras permitidas por tercios','',thirds.to_markdown(index=False),'','## Fase 10 — familias ponderadas','',f10.to_markdown(index=False),'','## Método','- F7: MLB gameLog + linescore + PBP; fuerza por criterio rector RA/G, localía, tercios, abridor/bullpen y entradas 3+.','- F9: TTO del abridor Cleveland por PA secuenciales 1–9, 10–18, 19–27 y 28+; RA por tercios reconciliadas al total.','- F10: Baseball Savant consultado por cada game_pk canónico, evitando el sesgo del filtro team=pitcher. Whiff% ponderado por swings; BA/OBP/SLG/wOBA/xwOBA por PA terminal; run value por suma de delta_run_exp.','- No se promedian porcentajes individuales ni se mezclan cortes.']
+          (OUT/'CLE_V16_NOTION_BLOCK.md').write_text('\n'.join(md),encoding='utf-8')
+          print(f10.to_string(index=False)); print(json.dumps(qa,indent=2))
+          PY
+      - name: Commit final Cleveland outputs
+        if: always()
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/cle_v16_final || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'CLE V1.6: finalize F10 with gamePk Statcast and cross-block QA'; git push; fi
