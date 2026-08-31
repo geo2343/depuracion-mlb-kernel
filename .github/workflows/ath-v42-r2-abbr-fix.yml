@@ -1,0 +1,57 @@
+name: ATH V4.2 R2 Abbreviation Fix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/ath-v42-r2-abbr-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests pandas numpy tabulate lxml
+      - name: Run corrected core reconstruction
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+          src=Path('.github/workflows/ath-v42-rebuild-material-gaps.yml').read_text(encoding='utf-8')
+          marker="          python - <<'PY'\n"
+          start=src.index(marker)+len(marker)
+          end=src.index("\n          PY",start)
+          code=dedent(src[start:end])
+          old="{'OAK':'ATH','WSN':'WSH','KCR':'KC','SDP':'SD','SFG':'SF','TBR':'TB','CHW':'CWS'}"
+          new="{'OAK':'ATH','AZ':'ARI','WSN':'WSH','KCR':'KC','SDP':'SD','SFG':'SF','TBR':'TB','CHW':'CWS'}"
+          if old not in code: raise RuntimeError('normalization pattern missing')
+          code=code.replace(old,new)
+          exec(compile(code,'ath_v42_r2.py','exec'),{'__name__':'__main__'})
+          PY
+      - name: Fetch defense FRV raw controls
+        if: success()
+        run: |
+          python - <<'PY'
+          import requests
+          from pathlib import Path
+          out=Path('runtime/ath_v42_final')
+          qs={
+          '2024':'gameType=Regular&minInnings=0&minResults=1&position=0&seasonEnd=2024&seasonStart=2024&team=133&type=fielder&csv=true',
+          '2025':'gameType=Regular&minInnings=0&minResults=1&position=0&seasonEnd=2025&seasonStart=2025&team=133&type=fielder&csv=true',
+          '2026_cut':'dateEnd=2026-07-21&dateStart=2026-03-25&gameType=Regular&minInnings=0&minResults=1&position=0&seasonEnd=2026&seasonStart=2026&team=133&type=fielder&csv=true'}
+          for k,q in qs.items():
+            r=requests.get('https://baseballsavant.mlb.com/leaderboard/fielding-run-value?'+q,headers={'User-Agent':'Mozilla/5.0'},timeout=90);r.raise_for_status();(out/f'frv_{k}_raw.csv').write_bytes(r.content);print(k,len(r.content),r.headers.get('content-type'))
+          PY
+      - name: Commit outputs
+        if: always()
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/ath_v42_final || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'ATH V4.2 R2: canonical reconstruction and FRV controls'; git push; fi
