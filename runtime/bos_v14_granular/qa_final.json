@@ -1,0 +1,20 @@
+{
+  "game_pk": 824733,
+  "cutoff": "2026-07-23",
+  "official_lineup_rows": 9,
+  "bos_pregame_games": 101,
+  "u10_games": 10,
+  "season_batter_coverage": 9,
+  "yesavage_id": 702056,
+  "yesavage_games": 15,
+  "yesavage_pitches": 1332,
+  "B11_rows": 72,
+  "B13_shape_rows": 3,
+  "B13_compat_rows": 27,
+  "B14_rows": 54,
+  "B15_rows": 153,
+  "B18_rows": 9,
+  "B19_rows": 9,
+  "B19_total_PA": 32,
+  "status": "PASS"
+}
