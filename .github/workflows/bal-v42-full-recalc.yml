@@ -1,0 +1,216 @@
+name: BAL V4.2 Full Recalc
+
+on:
+  push:
+    paths:
+      - '.github/workflows/bal-v42-full-recalc.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests pandas numpy tabulate
+      - name: Reconstruct Baltimore audit gaps
+        run: |
+          python - <<'PY'
+          import io,json,time
+          from pathlib import Path
+          from concurrent.futures import ThreadPoolExecutor,as_completed
+          import requests,pandas as pd,numpy as np
+
+          OUT=Path('runtime/bal_v42_final');OUT.mkdir(parents=True,exist_ok=True)
+          TEAM_ID=110;TEAM='BAL';H={'User-Agent':'Mozilla/5.0 BAL-V4.2/1.0'}
+          periods={
+            '2024':('2024-03-28','2024-09-29',162,3.166),
+            '2025':('2025-03-27','2025-09-28',162,3.135),
+            '2026_CUTOFF':('2026-03-25','2026-07-20',101,None),
+          }
+          def getj(url,params=None,tries=8):
+            last=None
+            for i in range(tries):
+              try:
+                r=requests.get(url,params=params,headers=H,timeout=90);r.raise_for_status();return r.json()
+              except Exception as e:last=e;time.sleep(1.2*(i+1))
+            raise last
+          teams=getj('https://statsapi.mlb.com/api/v1/teams',{'sportId':1})['teams'];meta={int(t['id']):{'name':t['name'],'abbr':t.get('abbreviation','')} for t in teams};team_ids=list(meta)
+          def nabbr(x):
+            x=str(x).upper();return {'AZ':'ARI','OAK':'ATH','WSN':'WSH','KCR':'KC','SDP':'SD','SFG':'SF','TBR':'TB','CHW':'CWS'}.get(x,x)
+          def gamelog(y,end):
+            j=getj(f'https://statsapi.mlb.com/api/v1/teams/{TEAM_ID}/stats',{'stats':'gameLog','group':'hitting','season':y,'gameType':'R'})
+            r=[]
+            for s in j.get('stats',[{}])[0].get('splits',[]):
+              dt=s.get('date');pk=(s.get('game') or {}).get('gamePk')
+              if dt and pk and dt<=end:r.append({'DATE':dt,'GAME_PK':int(pk),'RS_GAMELOG':int((s.get('stat') or {}).get('runs',0))})
+            return pd.DataFrame(r).drop_duplicates('GAME_PK').sort_values(['DATE','GAME_PK']).reset_index(drop=True)
+          us=[]
+          for p,(start,end,eg,cf) in periods.items():
+            d=gamelog(int(p[:4]),end)
+            if len(d)!=eg:raise RuntimeError(f'{p}: gameLog {len(d)} != {eg}')
+            d['PERIOD']=p;us.append(d)
+          uni=pd.concat(us,ignore_index=True)
+          if len(uni)!=425 or uni.GAME_PK.nunique()!=425:raise RuntimeError('425 universe failed')
+          uni.to_csv(OUT/'bal_425_gamelog_universe.csv',index=False)
+
+          # RA/G strength ranking, with officialDate cutoff and gamePk dedupe.
+          strength={};rankfiles={}
+          for p,(start,end,eg,cf) in periods.items():
+            j=getj('https://statsapi.mlb.com/api/v1/schedule',{'sportId':1,'gameTypes':'R','startDate':start,'endDate':end,'hydrate':'team'})
+            seen=set();agg={}
+            for dd in j.get('dates',[]):
+              for g in dd.get('games',[]):
+                if g.get('gameType')!='R' or g.get('status',{}).get('abstractGameState')!='Final':continue
+                if str(g.get('officialDate','9999-99-99'))>end:continue
+                pk=int(g['gamePk'])
+                if pk in seen:continue
+                seen.add(pk);a=g['teams']['away'];h=g['teams']['home']
+                if a.get('score') is None or h.get('score') is None:continue
+                aid=int(a['team']['id']);hid=int(h['team']['id']);ar=int(a['score']);hr=int(h['score'])
+                for tid,ra in [(aid,hr),(hid,ar)]:x=agg.setdefault(tid,[0,0]);x[0]+=1;x[1]+=ra
+            rk=pd.DataFrame([{'TEAM_ID':tid,'TEAM':meta[tid]['name'],'ABBR':nabbr(meta[tid]['abbr']),'G':v[0],'RA':v[1],'RA_G':v[1]/v[0]} for tid,v in agg.items() if tid in meta and v[0]])
+            if len(rk)!=30:raise RuntimeError(f'{p}: rank teams={len(rk)}')
+            rk=rk.sort_values(['RA_G','RA','TEAM']).reset_index(drop=True);rk['RANK']=np.arange(1,31);rk['OPP_STRENGTH']=np.where(rk.RANK<=10,'FUERTE',np.where(rk.RANK<=20,'MEDIO','DEBIL'));rk.to_csv(OUT/f'ra_g_rank_{p}.csv',index=False);strength[p]={int(r.TEAM_ID):r.OPP_STRENGTH for r in rk.itertuples()}
+
+          def feed(pk):return int(pk),getj(f'https://statsapi.mlb.com/api/v1.1/game/{int(pk)}/feed/live')
+          feeds={}
+          with ThreadPoolExecutor(max_workers=14) as ex:
+            fs=[ex.submit(feed,x) for x in uni.GAME_PK]
+            for i,f in enumerate(as_completed(fs),1):pk,j=f.result();feeds[pk]=j;print('feeds',i,'/425') if i%50==0 else None
+
+          def ipouts(v):
+            a=str(v).split('.');return int(a[0])*3+(int(a[1]) if len(a)>1 else 0)
+          games=[];trace=[];pitch_units=[];tto=[]
+          for u in uni.itertuples(index=False):
+            pk=int(u.GAME_PK);j=feeds[pk];gd=j['gameData'];ld=j['liveData'];hid=int(gd['teams']['home']['id']);aid=int(gd['teams']['away']['id']);home=hid==TEAM_ID;side='home' if home else 'away';opp='away' if home else 'home';oppid=aid if home else hid
+            ls=ld['linescore'];rs=int(ls['teams'][side]['runs']);ra=int(ls['teams'][opp]['runs'])
+            if rs!=int(u.RS_GAMELOG):raise RuntimeError(f'{pk} RS mismatch')
+            oi=[];di=[]
+            for inn in ls.get('innings',[]):
+              n=int(inn.get('num',0) or 0);a=(inn.get(side,{}) or {}).get('runs');b=(inn.get(opp,{}) or {}).get('runs')
+              if a is not None:oi.append((n,int(a)))
+              if b is not None:di.append((n,int(b)))
+            ob=ld['boxscore']['teams'][opp];opl=[int(x) for x in ob.get('pitchers',[])];ost=[]
+            for pp in ob.get('players',{}).values():
+              ps=pp.get('stats',{}).get('pitching') or {};pid=(pp.get('person') or {}).get('id')
+              if pid is not None and int(ps.get('gamesStarted',0) or 0)==1:ost.append(int(pid))
+            ostarter=ost[0] if len(ost)==1 else (opl[0] if opl else None)
+            if ostarter is None:raise RuntimeError(f'{pk} opponent starter')
+            sr=br=ur=0;half='bottom' if home else 'top';opset=set(opl)
+            for play in ld['plays']['allPlays']:
+              if play.get('about',{}).get('halfInning')!=half:continue
+              for rn in play.get('runners',[]):
+                if rn.get('movement',{}).get('end')!='score':continue
+                rp=rn.get('details',{}).get('responsiblePitcher');rpid=rp.get('id') if isinstance(rp,dict) else None
+                if rpid is None:ur+=1;cl='UNRESOLVED'
+                elif int(rpid)==ostarter:sr+=1;cl='STARTER'
+                elif int(rpid) in opset:br+=1;cl='BULLPEN'
+                else:ur+=1;cl='UNRESOLVED'
+                trace.append({'PERIOD':u.PERIOD,'GAME_PK':pk,'RESP_PITCHER':rpid,'CLASS':cl,'INNING':play.get('about',{}).get('inning')})
+            if sr+br+ur!=rs:raise RuntimeError(f'{pk} run attribution {sr+br+ur}!={rs}')
+            # Baltimore staff units and starter TTO.
+            tb=ld['boxscore']['teams'][side];pl=[int(x) for x in tb.get('pitchers',[])];sts=[]
+            for pp in tb.get('players',{}).values():
+              ps=pp.get('stats',{}).get('pitching') or {};pid=(pp.get('person') or {}).get('id')
+              if pid is not None and int(ps.get('gamesStarted',0) or 0)==1:sts.append(int(pid))
+            starter=sts[0] if len(sts)==1 else (pl[0] if pl else None)
+            if starter is None:raise RuntimeError(f'{pk} BAL starter')
+            for pid in pl:
+              pp=tb.get('players',{}).get('ID'+str(pid),{});ps=pp.get('stats',{}).get('pitching') or {}
+              if not ps:continue
+              pitch_units.append({'PERIOD':u.PERIOD,'GAME_PK':pk,'PITCHER_ID':pid,'ROLE':'STARTER' if pid==starter else 'BULLPEN','OUTS':ipouts(ps.get('inningsPitched','0.0')),'H':int(ps.get('hits',0) or 0),'ER':int(ps.get('earnedRuns',0) or 0),'HR':int(ps.get('homeRuns',0) or 0),'BB':int(ps.get('baseOnBalls',0) or 0),'HBP':int(ps.get('hitBatsmen',0) or 0),'SO':int(ps.get('strikeOuts',0) or 0),'BF':int(ps.get('battersFaced',0) or 0)})
+            opphalf='top' if home else 'bottom';idx=0
+            for play in ld['plays']['allPlays']:
+              if play.get('about',{}).get('halfInning')!=opphalf:continue
+              pid=(play.get('matchup',{}).get('pitcher') or {}).get('id')
+              if pid is None or int(pid)!=starter:continue
+              idx+=1;b='1' if idx<=9 else ('2' if idx<=18 else ('3' if idx<=27 else '4+'));ev=(play.get('result',{}).get('eventType') or '').lower();runs=sum(1 for rn in play.get('runners',[]) if rn.get('movement',{}).get('end')=='score')
+              tto.append({'PERIOD':u.PERIOD,'GAME_PK':pk,'TTO':b,'TBF':1,'H':int(ev in {'single','double','triple','home_run'}),'HR':int(ev=='home_run'),'BB':int(ev in {'walk','intent_walk'}),'HBP':int(ev=='hit_by_pitch'),'SO':int(ev in {'strikeout','strikeout_double_play'}),'R_ON_PLAY':runs})
+            games.append({'PERIOD':u.PERIOD,'DATE':u.DATE,'GAME_PK':pk,'IS_HOME':home,'VENUE':'HOME' if home else 'AWAY','OPP_ID':oppid,'OPP':meta[oppid]['name'],'OPP_STRENGTH':strength[u.PERIOD][oppid],'RS':rs,'RA':ra,'R_1_3':sum(x for n,x in oi if n<=3),'R_4_6':sum(x for n,x in oi if 4<=n<=6),'R_7_PLUS':sum(x for n,x in oi if n>=7),'RA_1_3':sum(x for n,x in di if n<=3),'RA_4_6':sum(x for n,x in di if 4<=n<=6),'RA_7_PLUS':sum(x for n,x in di if n>=7),'OFF_HALF_INNINGS':len(oi),'HALF_INNINGS_3PLUS':sum(x>=3 for _,x in oi),'STARTER_RUNS':sr,'BULLPEN_RUNS':br,'UNRESOLVED':ur})
+          games=pd.DataFrame(games);tr=pd.DataFrame(trace);pu=pd.DataFrame(pitch_units);tt=pd.DataFrame(tto)
+          if int(games.UNRESOLVED.sum())!=0:raise RuntimeError('unresolved offensive runs')
+          if len(tr)!=int(games.RS.sum()):raise RuntimeError(f'trace {len(tr)} != RS {games.RS.sum()}')
+          for p,(start,end,eg,cf) in periods.items():
+            if len(games[games.PERIOD==p])!=eg:raise RuntimeError(f'{p} reconstructed games')
+          games.to_csv(OUT/'bal_425_game_reconstruction.csv',index=False);tr.to_csv(OUT/'bal_run_trace.csv',index=False);pu.to_csv(OUT/'bal_pitching_appearances.csv',index=False)
+          order={'1':1,'2':2,'3':3,'4+':4};ta=tt.groupby(['PERIOD','TTO'],as_index=False).agg({'TBF':'sum','H':'sum','HR':'sum','BB':'sum','HBP':'sum','SO':'sum','R_ON_PLAY':'sum'});ta['O']=ta.TTO.map(order);ta=ta.sort_values(['PERIOD','O']).drop(columns='O');ta.to_csv(OUT/'phase9_tto.csv',index=False)
+          thirds=games.groupby('PERIOD',as_index=False).agg(G=('GAME_PK','size'),RA=('RA','sum'),RA_1_3=('RA_1_3','sum'),RA_4_6=('RA_4_6','sum'),RA_7_PLUS=('RA_7_PLUS','sum'));thirds['CHECK']=thirds.RA_1_3+thirds.RA_4_6+thirds.RA_7_PLUS
+          if not (thirds.RA==thirds.CHECK).all():raise RuntimeError('RA thirds')
+          thirds.to_csv(OUT/'phase9_ra_thirds.csv',index=False)
+
+          # Derive 2026 cutoff cFIP from league by-date pitching totals.
+          def team_range(tid):
+            j=getj(f'https://statsapi.mlb.com/api/v1/teams/{tid}/stats',{'stats':'byDateRange','group':'pitching','startDate':'2026-03-25','endDate':'2026-07-20','gameType':'R'})
+            s=j.get('stats',[{}])[0].get('splits',[]);return (s[0].get('stat') or {}) if s else {}
+          league=[]
+          with ThreadPoolExecutor(max_workers=15) as ex:
+            fs=[ex.submit(team_range,x) for x in team_ids]
+            for f in as_completed(fs):league.append(f.result())
+          outs=sum(ipouts(x.get('inningsPitched','0.0')) for x in league);ip=outs/3;er=sum(int(x.get('earnedRuns',0) or 0) for x in league);hr=sum(int(x.get('homeRuns',0) or 0) for x in league);bb=sum(int(x.get('baseOnBalls',0) or 0) for x in league);hbp=sum(int(x.get('hitBatsmen',0) or 0) for x in league);so=sum(int(x.get('strikeOuts',0) or 0) for x in league);lgERA=er*9/ip;c2026=lgERA-((13*hr+3*(bb+hbp)-2*so)/ip)
+          constants={'2024':3.166,'2025':3.135,'2026_CUTOFF':c2026};(OUT/'fip_constants.json').write_text(json.dumps(constants,indent=2),encoding='utf-8')
+          ua=[]
+          for (p,role),x in pu.groupby(['PERIOD','ROLE']):
+            outs=int(x.OUTS.sum());ip=outs/3;Hn=int(x.H.sum());ER=int(x.ER.sum());HRn=int(x.HR.sum());BBn=int(x.BB.sum());HBP=int(x.HBP.sum());SO=int(x.SO.sum());BF=int(x.BF.sum());cf=constants[p]
+            ua.append({'PERIOD':p,'ROLE':role,'IP':round(ip,3),'H':Hn,'ER':ER,'HR':HRn,'BB':BBn,'HBP':HBP,'SO':SO,'BF':BF,'ERA':round(ER*9/ip,3),'WHIP':round((Hn+BBn)/ip,3),'K9':round(SO*9/ip,3),'BB9':round(BBn*9/ip,3),'HR9':round(HRn*9/ip,3),'K_PCT':round(100*SO/BF,2),'BB_PCT':round(100*BBn/BF,2),'K_BB_PCT':round(100*(SO-BBn)/BF,2),'FIP':round((13*HRn+3*(BBn+HBP)-2*SO)/ip+cf,3)})
+          units=pd.DataFrame(ua);units.to_csv(OUT/'phase9_rotation_bullpen.csv',index=False)
+
+          # Savant canonical gamePk; offense filters, RISP, two-outs, handedness, families.
+          def sav(pk):
+            url=f'https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk={int(pk)}';last=None
+            for i in range(7):
+              try:
+                r=requests.get(url,headers=H,timeout=90);r.raise_for_status();d=pd.read_csv(io.StringIO(r.text));
+                if d.empty:raise RuntimeError('empty')
+                return int(pk),d
+              except Exception as e:last=e;time.sleep(1.2*(i+1))
+            raise last
+          fs=[]
+          with ThreadPoolExecutor(max_workers=12) as ex:
+            fut=[ex.submit(sav,x) for x in uni.GAME_PK]
+            for i,f in enumerate(as_completed(fut),1):pk,d=f.result();fs.append(d);print('savant',i,'/425') if i%50==0 else None
+          z=pd.concat(fs,ignore_index=True);z['game_pk']=pd.to_numeric(z.game_pk,errors='coerce').astype('Int64');gm=games.set_index('GAME_PK')[['PERIOD','IS_HOME','OPP_STRENGTH','VENUE']].to_dict('index');z['PERIOD']=z.game_pk.map(lambda x:gm[int(x)]['PERIOD']);z['IS_HOME']=z.game_pk.map(lambda x:gm[int(x)]['IS_HOME']);z['OPP_STRENGTH']=z.game_pk.map(lambda x:gm[int(x)]['OPP_STRENGTH']);z['VENUE']=z.game_pk.map(lambda x:gm[int(x)]['VENUE']);bot=z.inning_topbot.astype(str).str.lower().isin(['bot','bottom']);top=z.inning_topbot.astype(str).str.lower().eq('top');bat=z[(z.IS_HOME.astype(bool)&bot)|((~z.IS_HOME.astype(bool))&top)].copy();cov=bat.groupby('PERIOD').game_pk.nunique().to_dict();
+          if cov!={'2024':162,'2025':162,'2026_CUTOFF':101}:raise RuntimeError(f'Savant cov {cov}')
+          pa=bat[bat.events.notna()].copy();pa['RISP']=pa.on_2b.notna()|pa.on_3b.notna();pa['RISP_H']=pa.RISP & pa.events.astype(str).isin(['single','double','triple','home_run']);pa['TWO_OUT']=pd.to_numeric(pa.outs_when_up,errors='coerce').eq(2);pa['TWO_OUT_H']=pa.TWO_OUT & pa.events.astype(str).isin(['single','double','triple','home_run'])
+          dep=pa.groupby(['PERIOD','OPP_STRENGTH','VENUE'],as_index=False).agg(PA=('events','size'),HR=('events',lambda s:int((s.astype(str)=='home_run').sum())),BB=('events',lambda s:int(s.astype(str).isin(['walk','intent_walk']).sum())),ERROR_PA=('events',lambda s:int((s.astype(str)=='field_error').sum())),RISP_PA=('RISP','sum'),RISP_H=('RISP_H','sum'),TWO_OUT_PA=('TWO_OUT','sum'),TWO_OUT_H=('TWO_OUT_H','sum'))
+          base=games.groupby(['PERIOD','OPP_STRENGTH','VENUE'],as_index=False).agg(G=('GAME_PK','size'),RS=('RS','sum'),R_1_3=('R_1_3','sum'),R_4_6=('R_4_6','sum'),R_7_PLUS=('R_7_PLUS','sum'),STARTER_RUNS=('STARTER_RUNS','sum'),BULLPEN_RUNS=('BULLPEN_RUNS','sum'),OFF_HALF_INNINGS=('OFF_HALF_INNINGS','sum'),HALF_INNINGS_3PLUS=('HALF_INNINGS_3PLUS','sum'));f7=base.merge(dep,on=['PERIOD','OPP_STRENGTH','VENUE'],how='left');f7['R_G']=f7.RS/f7.G;f7['STARTER_RUNS_G']=f7.STARTER_RUNS/f7.G;f7['BULLPEN_RUNS_G']=f7.BULLPEN_RUNS/f7.G;f7['HI_3PLUS_PCT']=100*f7.HALF_INNINGS_3PLUS/f7.OFF_HALF_INNINGS;f7['RISP_H_PCT']=100*f7.RISP_H/f7.RISP_PA;f7['TWO_OUT_H_PCT']=100*f7.TWO_OUT_H/f7.TWO_OUT_PA;f7.to_csv(OUT/'phase7_integral_matrix.csv',index=False)
+
+          swdesc={'swinging_strike','swinging_strike_blocked','foul','foul_tip','hit_into_play','hit_into_play_no_out','hit_into_play_score'};whdesc={'swinging_strike','swinging_strike_blocked'};abev={'single','double','triple','home_run','field_out','force_out','grounded_into_double_play','field_error','fielders_choice','fielders_choice_out','strikeout','strikeout_double_play','double_play','triple_play'};fams={'FASTBALL':{'FF','SI','FC'},'BREAKING':{'CU','KC','CS','SL','ST','SV'},'OFFSPEED':{'CH','FS','FO','SC'}}
+          def pa_metrics(q):
+            ev=q.events.astype(str);AB=int(ev.isin(abev).sum());Hn=int(ev.isin(['single','double','triple','home_run']).sum());d2=int((ev=='double').sum());d3=int((ev=='triple').sum());hr=int((ev=='home_run').sum());BBn=int(ev.isin(['walk','intent_walk']).sum());HBP=int((ev=='hit_by_pitch').sum());SF=int((ev=='sac_fly').sum());tb=Hn+d2+2*d3+3*hr;wv=pd.to_numeric(q.woba_value,errors='coerce');wd=pd.to_numeric(q.woba_denom,errors='coerce');est=pd.to_numeric(q.estimated_woba_using_speedangle,errors='coerce');xc=wv.copy();xc.loc[est.notna()]=est.loc[est.notna()];den=wd.fillna(0).sum();return AB,Hn,BBn,HBP,SF,tb,round(Hn/AB,3),round((Hn+BBn+HBP)/(AB+BBn+HBP+SF),3),round(tb/AB,3),round(float(wv.fillna(0).sum()/den),3),round(float(xc.fillna(0).sum()/den),3)
+          f10=[];hand=[];overall=[]
+          for p in periods:
+            zz=bat[bat.PERIOD==p].copy();desc=zz.description.astype(str);swing=desc.isin(swdesc);wh=desc.isin(whdesc);zone=pd.to_numeric(zz.zone,errors='coerce');outside=~zone.isin(range(1,10));bbe=pd.to_numeric(zz.launch_speed,errors='coerce').notna();q=zz[zz.events.notna()].copy();met=pa_metrics(q);overall.append({'PERIOD':p,'PITCHES':len(zz),'CHASE_PCT':round(100*int((swing&outside).sum())/int(outside.sum()),2),'WHIFF_PCT':round(100*int(wh.sum())/int(swing.sum()),2),'CONTACT_PCT':round(100*(int(swing.sum())-int(wh.sum()))/int(swing.sum()),2),'EV':round(float(pd.to_numeric(zz.launch_speed,errors='coerce').mean()),2),'HARD_HIT_PCT':round(100*float((pd.to_numeric(zz.launch_speed,errors='coerce')>=95).sum())/int(bbe.sum()),2),'BARREL_PCT':round(100*float((pd.to_numeric(zz.launch_speed_angle,errors='coerce')==6).sum())/int(bbe.sum()),2),'wOBA':met[-2],'xwOBA':met[-1]})
+            for h in ['L','R']:
+              qq=q[q.p_throws.astype(str)==h];m=pa_metrics(qq);hand.append({'PERIOD':p,'P_THROWS':h,'PA_TERMINAL':len(qq),'BA':m[6],'OBP':m[7],'SLG':m[8],'wOBA':m[9],'xwOBA':m[10]})
+            for fam,codes in fams.items():
+              d=zz[zz.pitch_type.astype(str).isin(codes)].copy();de=d.description.astype(str);sw=de.isin(swdesc);wf=de.isin(whdesc);qq=d[d.events.notna()].copy();m=pa_metrics(qq);f10.append({'PERIOD':p,'FAMILY':fam,'PITCHES':len(d),'WHIFF_PCT':round(100*int(wf.sum())/int(sw.sum()),2),'PA_TERMINAL':len(qq),'BA':m[6],'OBP':m[7],'SLG':m[8],'wOBA':m[9],'xwOBA':m[10],'RUN_VALUE':round(float(pd.to_numeric(d.delta_run_exp,errors='coerce').fillna(0).sum()),1)})
+          pd.DataFrame(overall).to_csv(OUT/'statcast_offense_homogeneous.csv',index=False);pd.DataFrame(hand).to_csv(OUT/'phase8_handedness_splits.csv',index=False);pd.DataFrame(f10).to_csv(OUT/'phase10_pitch_family_splits.csv',index=False)
+
+          # Defense Savant by season/cutoff.
+          def frv(label,start,end):
+            q=f'dateEnd={end}&dateStart={start}&gameType=Regular&minInnings=0&minResults=1&position=0&seasonEnd={label[:4]}&seasonStart={label[:4]}&team={TEAM_ID}&type=fielder&csv=true';r=requests.get('https://baseballsavant.mlb.com/leaderboard/fielding-run-value?'+q,headers=H,timeout=90);r.raise_for_status();return pd.read_csv(io.StringIO(r.text))
+          dc=[]
+          for p,(start,end,eg,cf) in periods.items():
+            d=frv(p,start,end);cols=['total_runs','inf_of_runs','range_runs','arm_runs','dp_runs','fielding_runs_prevented_on_rec1b','catching_runs','framing_runs','throwing_runs','blocking_runs'];
+            for c in cols:d[c]=pd.to_numeric(d[c],errors='coerce').fillna(0)
+            s={c:float(d[c].sum()) for c in cols};top=s['inf_of_runs']+s['catching_runs'];cat=s['framing_runs']+s['throwing_runs']+s['blocking_runs'];dc.append({'PERIOD':p,'FRV_TOTAL':round(s['total_runs'],3),'INF_OF_RUNS':round(s['inf_of_runs'],3),'RANGE_RUNS':round(s['range_runs'],3),'ARM_RUNS':round(s['arm_runs'],3),'DP_RUNS':round(s['dp_runs'],3),'REC_1B_RUNS':round(s['fielding_runs_prevented_on_rec1b'],3),'CATCHING_RUNS':round(s['catching_runs'],3),'FRAMING_RUNS':round(s['framing_runs'],3),'THROWING_RUNS':round(s['throwing_runs'],3),'BLOCKING_RUNS':round(s['blocking_runs'],3),'TOP_DELTA':round(s['total_runs']-top,6),'CATCH_DELTA':round(s['catching_runs']-cat,6)})
+          defense=pd.DataFrame(dc);defense.to_csv(OUT/'phase11_savant_defense_team.csv',index=False)
+          if (defense.TOP_DELTA.abs()>0.001).any() or (defense.CATCH_DELTA.abs()>0.001).any():raise RuntimeError('defense reconciliation')
+          qa={'games':games.groupby('PERIOD').size().to_dict(),'rs':games.groupby('PERIOD').RS.sum().astype(int).to_dict(),'ra':games.groupby('PERIOD').RA.sum().astype(int).to_dict(),'run_trace_rows':len(tr),'unresolved_runs':int(games.UNRESOLVED.sum()),'statcast_game_coverage':cov,'f7_rows':len(f7),'tto_rows':len(ta),'unit_rows':len(units),'handedness_rows':len(hand),'f10_rows':len(f10),'defense_periods':len(defense),'defense_reconciled':True,'team_research_status':'PASS'};(OUT/'qa_final_team_research.json').write_text(json.dumps(qa,indent=2),encoding='utf-8')
+          md=['# BAL V4.2 — RECÁLCULO Y QA FINAL','',json.dumps(qa,indent=2),'','## F7','',f7.to_markdown(index=False),'','## Staff units','',units.to_markdown(index=False),'','## TTO','',ta.to_markdown(index=False),'','## RA thirds','',thirds.to_markdown(index=False),'','## Handedness','',pd.DataFrame(hand).to_markdown(index=False),'','## Pitch families','',pd.DataFrame(f10).to_markdown(index=False),'','## Defense','',defense.to_markdown(index=False)]
+          (OUT/'BAL_V42_FINAL.md').write_text('\n'.join(md),encoding='utf-8')
+          print(json.dumps(qa,indent=2));print(units.to_string(index=False));print(defense.to_string(index=False))
+          PY
+      - name: Commit outputs
+        if: always()
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/bal_v42_final || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'BAL V4.2: rebuild audit gaps and final QA'; git push; fi
