@@ -1,0 +1,25 @@
+{
+  "game_counts": {
+    "2025": 162,
+    "2026_CUTOFF": 102
+  },
+  "rs_sums": {
+    "2025": 643,
+    "2026_CUTOFF": 410
+  },
+  "ra_sums": {
+    "2025": 649,
+    "2026_CUTOFF": 410
+  },
+  "offensive_run_trace_rows": 1053,
+  "unresolved_offensive_runs": 0,
+  "f7_rows": 12,
+  "f9_tto_rows": 8,
+  "f10_rows": 6,
+  "statcast_game_coverage": {
+    "2025": 162,
+    "2026_CUTOFF": 102
+  },
+  "ra_thirds_reconciled": true,
+  "status": "PASS"
+}
