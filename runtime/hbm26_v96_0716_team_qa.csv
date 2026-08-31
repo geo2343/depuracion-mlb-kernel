@@ -1,0 +1,3 @@
+date,game_pk,team,match_excluding_er,sum_bf,sum_outs,sum_r,sum_h,sum_bb,sum_k,sum_hr,team_bf,team_outs,team_r,team_h,team_bb,team_k,team_hr,sum_er,team_er
+2026-07-16,823440,NYM,True,32,27,1,4,1,9,1,32,27,1,4,1,9,1,1,1
+2026-07-16,823440,PHI,True,38,27,4,7,6,8,3,38,27,4,7,6,8,3,4,4
