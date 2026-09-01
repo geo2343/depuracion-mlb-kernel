@@ -1,0 +1,51 @@
+{
+  "date": "2026-08-03",
+  "prior_gate": true,
+  "prior_fact_rows": 14266,
+  "prior_fact_dups": 0,
+  "prior_bullpen_rows": 10798,
+  "prior_bullpen_dups": 0,
+  "prior_max_date": "2026-08-02",
+  "games": 8,
+  "game_pks": [
+    822867,
+    823431,
+    823520,
+    823757,
+    824160,
+    824324,
+    824647,
+    825095
+  ],
+  "pitch_rows": 2351,
+  "box_pitch_sum": 2351,
+  "pitch_delta": 0,
+  "pitch_mismatches": 0,
+  "orphan_rows": 0,
+  "team_line_failures": 0,
+  "duplicate_current_keys": 0,
+  "listed_nonappearances": 0,
+  "zero_pitch_actual_appearances": 0,
+  "fallback_games": 1,
+  "fallback_game_pks": [
+    823757
+  ],
+  "savant_games": 8,
+  "savant_pitch_total": 2351,
+  "savant_box_total": 2351,
+  "savant_delta": 0,
+  "savant_pitcher_mismatches": 0,
+  "savant_games_review": 0,
+  "savant_ok": true,
+  "all_physical_pitcher_appearances_0803": 62,
+  "bullpen_0803": 46,
+  "position_player_exclusions_0803": 0,
+  "unknown_prior_bullpen_rows": 1,
+  "unknown_prior_ids": [
+    "822867-663884"
+  ],
+  "unknown_zero_false_guard": true,
+  "cumulative_bullpen_rows": 10844,
+  "cumulative_duplicate_ids": 0,
+  "status": "PASS"
+}
