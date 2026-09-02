@@ -1,0 +1,131 @@
+GAME_DATE,GAME_PK,BATTER_ID,BATTER,STATUS,ORDER,POSITION,OPP_STARTER_HAND,REST_REASON,SOURCE,CUTOFF
+2026-07-10,823604,655316,Andruw Monasterio,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-10,823604,678011,Anthony Seigler,STARTER,1.0,2B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-10,823604,702332,Caleb Durbin,STARTER,6.0,3B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-10,823604,665966,Carlos Narváez,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-10,823604,678882,Ceddanne Rafaela,STARTER,2.0,CF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-10,823604,657136,Connor Wong,STARTER,8.0,C,R,STARTED,MLB feed/live,2026-07-23
+2026-07-10,823604,663330,Jahmai Jones,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-10,823604,680776,Jarren Duran,STARTER,7.0,LF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-10,823604,807799,Masataka Yoshida,STARTER,5.0,DH,R,STARTED,MLB feed/live,2026-07-23
+2026-07-10,823604,663853,Romy Gonzalez,STARTER,4.0,1B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-10,823604,691907,Tsung-Che Cheng,STARTER,9.0,SS,R,STARTED,MLB feed/live,2026-07-23
+2026-07-10,823604,575929,Willson Contreras,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-10,823604,677800,Wilyer Abreu,STARTER,3.0,RF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-11,823603,655316,Andruw Monasterio,STARTER,6.0,SS,R,STARTED,MLB feed/live,2026-07-23
+2026-07-11,823603,678011,Anthony Seigler,STARTER,1.0,2B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-11,823603,702332,Caleb Durbin,STARTER,4.0,3B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-11,823603,665966,Carlos Narváez,STARTER,8.0,C,R,STARTED,MLB feed/live,2026-07-23
+2026-07-11,823603,678882,Ceddanne Rafaela,STARTER,2.0,CF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-11,823603,657136,Connor Wong,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-11,823603,663330,Jahmai Jones,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-11,823603,680776,Jarren Duran,STARTER,7.0,LF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-11,823603,807799,Masataka Yoshida,STARTER,5.0,DH,R,STARTED,MLB feed/live,2026-07-23
+2026-07-11,823603,663853,Romy Gonzalez,SUB_USED,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-11,823603,691907,Tsung-Che Cheng,STARTER,9.0,SS,R,STARTED,MLB feed/live,2026-07-23
+2026-07-11,823603,575929,Willson Contreras,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-11,823603,677800,Wilyer Abreu,STARTER,3.0,RF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-12,823602,655316,Andruw Monasterio,STARTER,6.0,1B,L,STARTED,MLB feed/live,2026-07-23
+2026-07-12,823602,678011,Anthony Seigler,STARTER,1.0,2B,L,STARTED,MLB feed/live,2026-07-23
+2026-07-12,823602,702332,Caleb Durbin,STARTER,5.0,3B,L,STARTED,MLB feed/live,2026-07-23
+2026-07-12,823602,665966,Carlos Narváez,NOT_START,,BENCH_OR_ABSENT,L,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-12,823602,678882,Ceddanne Rafaela,STARTER,2.0,CF,L,STARTED,MLB feed/live,2026-07-23
+2026-07-12,823602,657136,Connor Wong,STARTER,9.0,C,L,STARTED,MLB feed/live,2026-07-23
+2026-07-12,823602,663330,Jahmai Jones,NOT_START,,BENCH_OR_ABSENT,L,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-12,823602,680776,Jarren Duran,STARTER,7.0,DH,L,STARTED,MLB feed/live,2026-07-23
+2026-07-12,823602,807799,Masataka Yoshida,SUB_USED,,BENCH_OR_ABSENT,L,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-12,823602,663853,Romy Gonzalez,STARTER,4.0,1B,L,STARTED,MLB feed/live,2026-07-23
+2026-07-12,823602,691907,Tsung-Che Cheng,SUB_USED,,BENCH_OR_ABSENT,L,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-12,823602,575929,Willson Contreras,NOT_START,,BENCH_OR_ABSENT,L,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-12,823602,677800,Wilyer Abreu,STARTER,3.0,RF,L,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824737,655316,Andruw Monasterio,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-17,824766,655316,Andruw Monasterio,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-17,824737,678011,Anthony Seigler,STARTER,1.0,2B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824766,678011,Anthony Seigler,STARTER,1.0,2B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824737,702332,Caleb Durbin,STARTER,6.0,3B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824766,702332,Caleb Durbin,STARTER,4.0,3B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824737,665966,Carlos Narváez,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-17,824766,665966,Carlos Narváez,STARTER,8.0,C,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824737,678882,Ceddanne Rafaela,STARTER,2.0,CF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824766,678882,Ceddanne Rafaela,STARTER,2.0,CF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824737,657136,Connor Wong,STARTER,8.0,C,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824766,657136,Connor Wong,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-17,824737,663330,Jahmai Jones,SUB_USED,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-17,824766,663330,Jahmai Jones,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-17,824737,680776,Jarren Duran,STARTER,7.0,LF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824766,680776,Jarren Duran,STARTER,7.0,LF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824737,807799,Masataka Yoshida,STARTER,5.0,DH,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824766,807799,Masataka Yoshida,STARTER,5.0,DH,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824737,663853,Romy Gonzalez,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-17,824766,663853,Romy Gonzalez,STARTER,6.0,1B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824737,691907,Tsung-Che Cheng,STARTER,9.0,SS,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824766,691907,Tsung-Che Cheng,STARTER,9.0,SS,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824737,575929,Willson Contreras,STARTER,4.0,1B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824766,575929,Willson Contreras,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-17,824737,677800,Wilyer Abreu,STARTER,3.0,RF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-17,824766,677800,Wilyer Abreu,STARTER,3.0,RF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-18,824738,655316,Andruw Monasterio,STARTER,7.0,SS,L,STARTED,MLB feed/live,2026-07-23
+2026-07-18,824738,678011,Anthony Seigler,STARTER,1.0,2B,L,STARTED,MLB feed/live,2026-07-23
+2026-07-18,824738,702332,Caleb Durbin,STARTER,6.0,3B,L,STARTED,MLB feed/live,2026-07-23
+2026-07-18,824738,665966,Carlos Narváez,STARTER,9.0,C,L,STARTED,MLB feed/live,2026-07-23
+2026-07-18,824738,678882,Ceddanne Rafaela,STARTER,2.0,CF,L,STARTED,MLB feed/live,2026-07-23
+2026-07-18,824738,657136,Connor Wong,SUB_USED,,BENCH_OR_ABSENT,L,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-18,824738,663330,Jahmai Jones,STARTER,8.0,LF,L,STARTED,MLB feed/live,2026-07-23
+2026-07-18,824738,680776,Jarren Duran,SUB_USED,,BENCH_OR_ABSENT,L,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-18,824738,807799,Masataka Yoshida,SUB_USED,,BENCH_OR_ABSENT,L,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-18,824738,663853,Romy Gonzalez,STARTER,5.0,DH,L,STARTED,MLB feed/live,2026-07-23
+2026-07-18,824738,691907,Tsung-Che Cheng,NOT_START,,BENCH_OR_ABSENT,L,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-18,824738,575929,Willson Contreras,STARTER,4.0,1B,L,STARTED,MLB feed/live,2026-07-23
+2026-07-18,824738,677800,Wilyer Abreu,STARTER,3.0,RF,L,STARTED,MLB feed/live,2026-07-23
+2026-07-19,824739,655316,Andruw Monasterio,STARTER,7.0,SS,L,STARTED,MLB feed/live,2026-07-23
+2026-07-19,824739,678011,Anthony Seigler,NOT_START,,BENCH_OR_ABSENT,L,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-19,824739,702332,Caleb Durbin,STARTER,5.0,3B,L,STARTED,MLB feed/live,2026-07-23
+2026-07-19,824739,665966,Carlos Narváez,NOT_START,,BENCH_OR_ABSENT,L,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-19,824739,678882,Ceddanne Rafaela,STARTER,2.0,CF,L,STARTED,MLB feed/live,2026-07-23
+2026-07-19,824739,657136,Connor Wong,STARTER,9.0,C,L,STARTED,MLB feed/live,2026-07-23
+2026-07-19,824739,663330,Jahmai Jones,STARTER,1.0,DH,L,STARTED,MLB feed/live,2026-07-23
+2026-07-19,824739,680776,Jarren Duran,STARTER,8.0,LF,L,STARTED,MLB feed/live,2026-07-23
+2026-07-19,824739,807799,Masataka Yoshida,NOT_START,,BENCH_OR_ABSENT,L,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-19,824739,663853,Romy Gonzalez,STARTER,6.0,2B,L,STARTED,MLB feed/live,2026-07-23
+2026-07-19,824739,691907,Tsung-Che Cheng,NOT_START,,BENCH_OR_ABSENT,L,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-19,824739,575929,Willson Contreras,STARTER,4.0,1B,L,STARTED,MLB feed/live,2026-07-23
+2026-07-19,824739,677800,Wilyer Abreu,STARTER,3.0,RF,L,STARTED,MLB feed/live,2026-07-23
+2026-07-20,824736,655316,Andruw Monasterio,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-20,824736,678011,Anthony Seigler,STARTER,1.0,2B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-20,824736,702332,Caleb Durbin,STARTER,6.0,3B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-20,824736,665966,Carlos Narváez,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-20,824736,678882,Ceddanne Rafaela,STARTER,2.0,CF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-20,824736,657136,Connor Wong,STARTER,8.0,C,R,STARTED,MLB feed/live,2026-07-23
+2026-07-20,824736,663330,Jahmai Jones,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-20,824736,680776,Jarren Duran,STARTER,7.0,LF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-20,824736,807799,Masataka Yoshida,STARTER,5.0,DH,R,STARTED,MLB feed/live,2026-07-23
+2026-07-20,824736,663853,Romy Gonzalez,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-20,824736,691907,Tsung-Che Cheng,STARTER,9.0,SS,R,STARTED,MLB feed/live,2026-07-23
+2026-07-20,824736,575929,Willson Contreras,STARTER,4.0,1B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-20,824736,677800,Wilyer Abreu,STARTER,3.0,RF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824732,655316,Andruw Monasterio,STARTER,8.0,SS,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824735,655316,Andruw Monasterio,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-22,824732,678011,Anthony Seigler,STARTER,1.0,2B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824735,678011,Anthony Seigler,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-22,824732,702332,Caleb Durbin,STARTER,6.0,3B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824735,702332,Caleb Durbin,STARTER,5.0,3B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824732,665966,Carlos Narváez,STARTER,9.0,C,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824735,665966,Carlos Narváez,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-22,824732,678882,Ceddanne Rafaela,STARTER,2.0,CF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824735,678882,Ceddanne Rafaela,STARTER,2.0,CF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824732,657136,Connor Wong,SUB_USED,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-22,824735,657136,Connor Wong,STARTER,8.0,C,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824732,663330,Jahmai Jones,SUB_USED,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-22,824735,663330,Jahmai Jones,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-22,824732,680776,Jarren Duran,STARTER,7.0,LF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824735,680776,Jarren Duran,STARTER,7.0,LF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824732,807799,Masataka Yoshida,STARTER,5.0,DH,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824735,807799,Masataka Yoshida,STARTER,1.0,DH,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824732,663853,Romy Gonzalez,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-22,824735,663853,Romy Gonzalez,STARTER,6.0,2B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824732,691907,Tsung-Che Cheng,NOT_START,,BENCH_OR_ABSENT,R,No public rest reason identified in official feed; no cause imputed.,MLB feed/live,2026-07-23
+2026-07-22,824735,691907,Tsung-Che Cheng,STARTER,9.0,SS,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824732,575929,Willson Contreras,STARTER,4.0,1B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824735,575929,Willson Contreras,STARTER,4.0,1B,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824732,677800,Wilyer Abreu,STARTER,3.0,RF,R,STARTED,MLB feed/live,2026-07-23
+2026-07-22,824735,677800,Wilyer Abreu,STARTER,3.0,RF,R,STARTED,MLB feed/live,2026-07-23

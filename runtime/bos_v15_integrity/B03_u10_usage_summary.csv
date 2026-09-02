@@ -1,0 +1,14 @@
+BATTER_ID,BATTER,STARTS_U10,BENCH_OR_NOT_START,SUB_USED,ORDERS_USED,POSITIONS_USED,STARTS_VS_RHP,STARTS_VS_LHP,CONSECUTIVE_STARTS_AT_CUTOFF,MODE_ORDER_U10,OFFICIAL_ORDER,ORDER_CHANGE_VS_MODE,REST_REASON_POLICY
+678011,Anthony Seigler,8,2,0,1,2B,6,2,1,1,1.0,0.0,Official feed only; unspecified managerial rests remain explicitly unknown.
+678882,Ceddanne Rafaela,10,0,0,2,CF,7,3,10,2,2.0,0.0,Official feed only; unspecified managerial rests remain explicitly unknown.
+677800,Wilyer Abreu,10,0,0,3,RF,7,3,10,3,3.0,0.0,Official feed only; unspecified managerial rests remain explicitly unknown.
+575929,Willson Contreras,6,4,0,4,1B,4,2,6,4,4.0,0.0,Official feed only; unspecified managerial rests remain explicitly unknown.
+807799,Masataka Yoshida,7,3,2,"1,5",DH,7,0,3,5,5.0,0.0,Official feed only; unspecified managerial rests remain explicitly unknown.
+702332,Caleb Durbin,10,0,0,"4,5,6",3B,7,3,10,6,6.0,0.0,Official feed only; unspecified managerial rests remain explicitly unknown.
+680776,Jarren Duran,9,1,1,"7,8","DH,LF",7,2,4,7,7.0,0.0,Official feed only; unspecified managerial rests remain explicitly unknown.
+655316,Andruw Monasterio,5,5,0,"6,7,8","1B,SS",2,3,1,6,8.0,2.0,Official feed only; unspecified managerial rests remain explicitly unknown.
+657136,Connor Wong,6,4,2,"8,9",C,4,2,0,8,9.0,1.0,Official feed only; unspecified managerial rests remain explicitly unknown.
+665966,Carlos Narváez,4,6,0,"8,9",C,3,1,1,8,,,Official feed only; unspecified managerial rests remain explicitly unknown.
+691907,Tsung-Che Cheng,6,4,1,9,SS,6,0,0,9,,,Official feed only; unspecified managerial rests remain explicitly unknown.
+663853,Romy Gonzalez,6,4,1,"4,5,6","1B,2B,DH",3,3,0,6,,,Official feed only; unspecified managerial rests remain explicitly unknown.
+663330,Jahmai Jones,2,8,2,"1,8","DH,LF",0,2,0,1,,,Official feed only; unspecified managerial rests remain explicitly unknown.
