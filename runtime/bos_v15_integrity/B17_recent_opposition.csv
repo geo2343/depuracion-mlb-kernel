@@ -1,0 +1,11 @@
+DATE,GAME_PK,OPPONENT,STARTER,STARTER_HAND,STARTER_PITCH_MIX,STARTER_AVG_VELO,BULLPEN_IP,BULLPEN_ER,BULLPEN_K,BULLPEN_BB,BULLPEN_ER9,PARK,COMPARABILITY_NOTE
+2026-07-10,823604,New York Mets,Nolan McLean,R,SI:29%/FF:29%/CU:19%,91.40408163265306,3.0,4,3,3,12.0,Citi Field,Observed opposition game; descriptive comparator only.
+2026-07-11,823603,New York Mets,Freddy Peralta,R,FF:62%/CU:21%/ST:8%,88.98695652173913,4.2,2,3,0,3.8571428571428568,Citi Field,Observed opposition game; descriptive comparator only.
+2026-07-12,823602,New York Mets,Zac Thornton,L,FF:43%/FC:28%/SL:13%,88.10609756097561,3.0,1,1,2,3.0,Citi Field,Observed opposition game; descriptive comparator only.
+2026-07-17,824737,Tampa Bay Rays,Mason Englert,R,CH:25%/CU:22%/SI:19%,85.04545454545455,3.0,0,2,2,0.0,Fenway Park,Observed opposition game; descriptive comparator only.
+2026-07-17,824766,Tampa Bay Rays,Griffin Jax,R,ST:27%/SI:24%/CH:22%,91.1929411764706,3.0,3,2,1,9.0,Fenway Park,Observed opposition game; descriptive comparator only.
+2026-07-18,824738,Tampa Bay Rays,Ian Seymour,L,FF:49%/CH:31%/ST:15%,87.03770491803279,5.0,2,4,1,3.6,Fenway Park,Observed opposition game; descriptive comparator only.
+2026-07-19,824739,Tampa Bay Rays,Shane McClanahan,L,FF:43%/CH:30%/CU:15%,89.31954022988506,3.0,0,2,1,0.0,Fenway Park,Observed opposition game; descriptive comparator only.
+2026-07-20,824736,Baltimore Orioles,Shane Baz,R,FF:33%/KC:32%/SI:14%,91.46103896103897,2.0,2,3,0,9.0,Fenway Park,Observed opposition game; descriptive comparator only.
+2026-07-22,824732,Baltimore Orioles,Kyle Bradish,R,SI:31%/CU:25%/SL:25%,90.11460674157303,3.0,0,1,0,0.0,Fenway Park,Observed opposition game; descriptive comparator only.
+2026-07-22,824735,Baltimore Orioles,Dean Kremer,R,FF:24%/FS:21%/FC:20%,87.1103448275862,2.0,0,1,0,0.0,Fenway Park,Observed opposition game; descriptive comparator only.

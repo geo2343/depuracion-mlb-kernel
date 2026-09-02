@@ -1,0 +1,25 @@
+{
+  "window": "2026-07-17..2026-07-23",
+  "games": 7,
+  "bullpen_ip": "29.1",
+  "ER": 14,
+  "K": 30,
+  "BB": 8,
+  "ER9": 4.295454545454546,
+  "pitches": 484,
+  "used_on_2026-07-23": [
+    {
+      "pitcher": "Louis Varland",
+      "pitches": 15,
+      "outs": 3
+    },
+    {
+      "pitcher": "Tyler Rogers",
+      "pitches": 9,
+      "outs": 3
+    }
+  ],
+  "u10_opponent_bullpen_ER9": 3.9789473684210526,
+  "comparability_delta_ER9": 0.3165071770334933,
+  "note": "Availability inferred only from recent workload; no guarantee of manager usage."
+}

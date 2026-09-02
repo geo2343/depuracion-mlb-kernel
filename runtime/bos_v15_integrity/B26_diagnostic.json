@@ -1,0 +1,98 @@
+{
+  "lineup_state": "OFFICIAL MLB; B4 projection N/A",
+  "individual_cards": "13/13 B6 + B7/B10/B21",
+  "matchup_matrix": "B18 9/9, V14 preserved",
+  "segments": [
+    {
+      "BLOCK": "B22_TOP4",
+      "ORDERS": "1,2,3,4",
+      "BATTERS": "Anthony Seigler | Ceddanne Rafaela | Wilyer Abreu | Willson Contreras",
+      "SEASON_PA": 1323,
+      "BB_PCT": 7.936507936507936,
+      "K_PCT": 21.012849584278158,
+      "XBH_PCT": 9.599395313681027,
+      "HR_PCT": 3.6281179138321997,
+      "HR_SHARE_XBH": 0.3779527559055118,
+      "MEAN_WOBA": 0.35833139392120483,
+      "MEAN_XWOBA": 0.33904311057668524,
+      "U10_PA": 146,
+      "U10_MEAN_WOBA": 0.39510048370832546,
+      "ORDER_CHANGES_VS_U10": "Anthony Seigler:1->1.0 | Ceddanne Rafaela:2->2.0 | Wilyer Abreu:3->3.0 | Willson Contreras:4->4.0",
+      "STRENGTH": "traffic/power balanced",
+      "VULNERABILITY": "no single dominant aggregate vulnerability",
+      "MATCHUP": "Use B18 individual matrix; no pick.",
+      "SAMPLE": "Season + U10 explicitly separated."
+    },
+    {
+      "BLOCK": "B23_TOP6",
+      "ORDERS": "1,2,3,4,5,6",
+      "BATTERS": "Anthony Seigler | Ceddanne Rafaela | Wilyer Abreu | Willson Contreras | Masataka Yoshida | Caleb Durbin",
+      "SEASON_PA": 1891,
+      "BB_PCT": 7.826546800634585,
+      "K_PCT": 18.455843469063986,
+      "XBH_PCT": 9.095716552088842,
+      "HR_PCT": 3.278688524590164,
+      "HR_SHARE_XBH": 0.36046511627906974,
+      "MEAN_WOBA": 0.3468119676876311,
+      "MEAN_XWOBA": 0.3275559019012368,
+      "U10_PA": 219,
+      "U10_MEAN_WOBA": 0.39993979270562896,
+      "ORDER_CHANGES_VS_U10": "Anthony Seigler:1->1.0 | Ceddanne Rafaela:2->2.0 | Wilyer Abreu:3->3.0 | Willson Contreras:4->4.0 | Masataka Yoshida:5->5.0 | Caleb Durbin:6->6.0",
+      "STRENGTH": "traffic/power balanced",
+      "VULNERABILITY": "no single dominant aggregate vulnerability",
+      "MATCHUP": "Use B18 individual matrix; no pick.",
+      "SAMPLE": "Season + U10 explicitly separated."
+    },
+    {
+      "BLOCK": "B24_6_9",
+      "ORDERS": "6,7,8,9",
+      "BATTERS": "Caleb Durbin | Jarren Duran | Andruw Monasterio | Connor Wong",
+      "SEASON_PA": 1079,
+      "BB_PCT": 7.32159406858202,
+      "K_PCT": 21.872103799814642,
+      "XBH_PCT": 7.877664504170529,
+      "HR_PCT": 2.6876737720111215,
+      "HR_SHARE_XBH": 0.3411764705882353,
+      "MEAN_WOBA": 0.31326444159418926,
+      "MEAN_XWOBA": 0.3020217802807895,
+      "U10_PA": 123,
+      "U10_MEAN_WOBA": 0.37495257452574526,
+      "ORDER_CHANGES_VS_U10": "Caleb Durbin:6->6.0 | Jarren Duran:7->7.0 | Andruw Monasterio:6->8.0 | Connor Wong:8->9.0",
+      "STRENGTH": "traffic/power balanced",
+      "VULNERABILITY": "no single dominant aggregate vulnerability",
+      "MATCHUP": "Use B18 individual matrix; no pick.",
+      "SAMPLE": "Season + U10 explicitly separated."
+    }
+  ],
+  "bench": "4/4 scenarios documented",
+  "material_advantages": [
+    "official lineup fixed",
+    "secondary-pitch matchup quantified",
+    "all mandatory windows explicit"
+  ],
+  "material_weaknesses": [
+    "small BvP samples",
+    "some bench/player windows limited",
+    "Toronto bullpen availability remains workload-based, not guaranteed"
+  ],
+  "primary_offensive_route": "Elevate counts, avoid chase on Yesavage splitter/slider, exploit individual damage zones documented in B14 and rotate traffic through top six.",
+  "neutralization_route": "Yesavage gets ahead and converts splitter/slider whiffs; Toronto bridges to rested relievers; bottom segment fails to reconnect to top four.",
+  "strongest_segment": "Top 4",
+  "most_vulnerable_segment": "6-9",
+  "diagnosis_changers": [
+    "scratch/lineup change",
+    "starter change",
+    "material roster/health news",
+    "unexpected bullpen unavailability"
+  ],
+  "contradictions": [],
+  "missing_applicable_blocks": [],
+  "reopen_conditions": [
+    "lineup or starter changes",
+    "material health/roster news",
+    "source contradiction"
+  ],
+  "version": "BOS-20260724-V15-INTEGRITY",
+  "frozen_candidate": true,
+  "pick": "PROHIBITED"
+}

@@ -1,0 +1,18 @@
+{
+  "cutoff": "2026-07-23",
+  "game_pk": 824733,
+  "pregame_games": 101,
+  "B03_rows": 130,
+  "B03_players": 13,
+  "B06_rows": 13,
+  "B07_rows": 156,
+  "B07_players": 13,
+  "B07_windows_min": 12,
+  "B17_rows": 10,
+  "B20_rows": 13,
+  "B22_B24_rows": 3,
+  "B25_rows": 4,
+  "B26_present": true,
+  "V14_QA": "PASS",
+  "status": "PASS"
+}
