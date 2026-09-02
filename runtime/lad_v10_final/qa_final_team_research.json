@@ -1,0 +1,32 @@
+{
+  "games": {
+    "2024": 162,
+    "2025": 162,
+    "2026_CUTOFF": 103
+  },
+  "rs": {
+    "2024": 842,
+    "2025": 825,
+    "2026_CUTOFF": 535
+  },
+  "ra": {
+    "2024": 686,
+    "2025": 683,
+    "2026_CUTOFF": 378
+  },
+  "run_trace_rows": 2202,
+  "unresolved_runs": 0,
+  "statcast_game_coverage": {
+    "2024": 162,
+    "2025": 162,
+    "2026_CUTOFF": 103
+  },
+  "f7_rows": 18,
+  "tto_rows": 12,
+  "unit_rows": 6,
+  "handedness_rows": 6,
+  "f10_rows": 9,
+  "defense_periods": 3,
+  "defense_reconciled": true,
+  "team_research_status": "PASS"
+}
