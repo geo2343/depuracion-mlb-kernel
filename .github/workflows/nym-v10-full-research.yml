@@ -46,6 +46,13 @@ jobs:
               ]
               for a,b in replacements:
                   code=code.replace(a,b)
+              # NYM 2024 ended on Sept. 30 because two Braves games were
+              # postponed and made up as a season-ending doubleheader.
+              code=code.replace(
+                  'reps=[',
+                  'reps=[\n    ("\'2024\':(\'2024-03-28\',\'2024-09-29\',162,3.166)","\'2024\':(\'2024-03-28\',\'2024-09-30\',162,3.166)"),',
+                  1
+              )
               return code
 
           ns={'__name__':'__main__'}
