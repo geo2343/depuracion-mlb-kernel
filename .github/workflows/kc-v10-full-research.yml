@@ -1,0 +1,63 @@
+name: KC V1.0 Full Research
+
+on:
+  push:
+    paths:
+      - '.github/workflows/kc-v10-full-research.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests pandas numpy tabulate
+      - name: Build Kansas City quantitative research core and synthesis
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, textwrap
+
+          src=Path('.github/workflows/cws-v10-full-research.yml').read_text(encoding='utf-8')
+          blocks=re.findall(r"python - <<'PY'\n(.*?)\n          PY",src,re.S)
+          if len(blocks)<2:
+              raise RuntimeError(f'Expected >=2 embedded python blocks, found {len(blocks)}')
+
+          def adapt(code):
+              code=textwrap.dedent(code)
+              replacements=[
+                  ('CWS-V1.0','KC-V1.0'),
+                  ('CWS V1.0','KC V1.0'),
+                  ('Chicago White Sox','Kansas City Royals'),
+                  ('White Sox','Royals'),
+                  ('runtime/cws_v10_final','runtime/kc_v10_final'),
+                  ("TEAM_ID=145;TEAM='CWS'","TEAM_ID=118;TEAM='KC'"),
+                  ('teams/145/stats','teams/118/stats'),
+                  ('TEAM_ID==145','TEAM_ID==118'),
+                  ('cws_','kc_'),
+                  ('BAL_V42_FINAL.md','KC_V10_FINAL.md'),
+                  ('CWS','KC'),
+                  ('145','118')
+              ]
+              for a,b in replacements:
+                  code=code.replace(a,b)
+              return code
+
+          ns={'__name__':'__main__'}
+          exec(compile(adapt(blocks[0]),'<kc-v10-core>','exec'),ns,ns)
+          ns2={'__name__':'__main__'}
+          exec(compile(adapt(blocks[1]),'<kc-v10-synthesis>','exec'),ns2,ns2)
+          PY
+      - name: Commit outputs
+        if: always()
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/kc_v10_final || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'KC V1.0: build reproducible team research'; git push; fi
