@@ -1,0 +1,67 @@
+name: LAA V1.0 Full Research
+
+on:
+  push:
+    paths:
+      - '.github/workflows/laa-v10-full-research.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests pandas numpy tabulate
+      - name: Build Angels quantitative research core and synthesis
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, textwrap
+
+          src=Path('.github/workflows/cws-v10-full-research.yml').read_text(encoding='utf-8')
+          blocks=re.findall(r"python - <<'PY'\n(.*?)\n          PY",src,re.S)
+          if len(blocks)<2:
+              raise RuntimeError(f'Expected >=2 embedded python blocks, found {len(blocks)}')
+
+          def adapt(code):
+              code=textwrap.dedent(code)
+              replacements=[
+                  ('CWS-V1.0','LAA-V1.0'),
+                  ('CWS V1.0','LAA V1.0'),
+                  ('Chicago White Sox','Los Angeles Angels'),
+                  ('White Sox','Angels'),
+                  ('runtime/cws_v10_final','runtime/laa_v10_final'),
+                  ("TEAM_ID=145;TEAM='CWS'","TEAM_ID=108;TEAM='LAA'"),
+                  ('teams/145/stats','teams/108/stats'),
+                  ('TEAM_ID==145','TEAM_ID==108'),
+                  ('cws_','laa_'),
+                  ('CWS','LAA'),
+                  ('145','108')
+              ]
+              for a,b in replacements:
+                  code=code.replace(a,b)
+              return code
+
+          ns={'__name__':'__main__'}
+          exec(compile(adapt(blocks[0]),'<laa-v10-core>','exec'),ns,ns)
+          out=Path('runtime/laa_v10_final')
+          legacy=out/'BAL_V42_FINAL.md'
+          canonical=out/'LAA_V10_FINAL.md'
+          if legacy.exists():
+              legacy.replace(canonical)
+          ns2={'__name__':'__main__'}
+          exec(compile(adapt(blocks[1]),'<laa-v10-synthesis>','exec'),ns2,ns2)
+          PY
+      - name: Commit outputs
+        if: always()
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/laa_v10_final || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'LAA V1.0: build reproducible team research'; git push; fi
