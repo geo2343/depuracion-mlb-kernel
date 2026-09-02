@@ -1,0 +1,239 @@
+name: BOS V15 Integrity Close
+
+on:
+  push:
+    paths:
+      - '.github/workflows/bos-v15-integrity-close.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet requests pandas numpy tabulate
+      - name: Reconstruct reopened contractual blocks
+        run: |
+          python - <<'PY'
+          import io,json,time,math,re
+          from pathlib import Path
+          from concurrent.futures import ThreadPoolExecutor,as_completed
+          import requests,pandas as pd,numpy as np
+
+          OUT=Path('runtime/bos_v15_integrity');OUT.mkdir(parents=True,exist_ok=True)
+          TEAM_ID=111; TOR_ID=141; GAME_PK=824733; CUTOFF='2026-07-23'; GAME_DATE='2026-07-24'
+          H={'User-Agent':'Mozilla/5.0 BOS-V15/1.0'}
+          ACTIVE_NAMES=['Anthony Seigler','Ceddanne Rafaela','Wilyer Abreu','Willson Contreras','Masataka Yoshida','Caleb Durbin','Jarren Duran','Andruw Monasterio','Connor Wong','Carlos Narváez','Tsung-Che Cheng','Romy Gonzalez','Jahmai Jones']
+          HIT={'single','double','triple','home_run'}; XBH={'double','triple','home_run'}; BB={'walk','intent_walk'}; K={'strikeout','strikeout_double_play'}
+          SW={'swinging_strike','swinging_strike_blocked','foul','foul_tip','hit_into_play','hit_into_play_no_out','hit_into_play_score'}; WH={'swinging_strike','swinging_strike_blocked'}
+          FAM={'FF':'FASTBALL','SI':'FASTBALL','FC':'FASTBALL','FA':'FASTBALL','SL':'BREAKING','ST':'BREAKING','SV':'BREAKING','CU':'BREAKING','KC':'BREAKING','CS':'BREAKING','CH':'OFFSPEED','FS':'OFFSPEED','FO':'OFFSPEED','SC':'OFFSPEED'}
+
+          def getj(url,params=None,tries=7):
+            last=None
+            for i in range(tries):
+              try:
+                r=requests.get(url,params=params,headers=H,timeout=90);r.raise_for_status();return r.json()
+              except Exception as e:last=e;time.sleep(1.0*(i+1))
+            raise last
+          def sav(pk,tries=6):
+            last=None;url=f'https://baseballsavant.mlb.com/statcast_search/csv?all=true&type=details&game_pk={int(pk)}'
+            for i in range(tries):
+              try:
+                r=requests.get(url,headers=H,timeout=90);r.raise_for_status();d=pd.read_csv(io.StringIO(r.text))
+                if d.empty:raise RuntimeError('empty savant')
+                return int(pk),d
+              except Exception as e:last=e;time.sleep(1.2*(i+1))
+            raise last
+          def ip_outs(v):
+            try:
+              a,b=str(v).split('.');return int(a)*3+int(b)
+            except:return 0
+          def outs_ip(o):return f'{o//3}.{o%3}'
+          def sdiv(a,b):return float(a)/float(b) if b else np.nan
+          def norm(s):return re.sub(r'[^a-z]','',str(s).lower())
+          def woba_x(d):
+            q=d[d.events.notna()].copy();wv=pd.to_numeric(q.woba_value,errors='coerce');wd=pd.to_numeric(q.woba_denom,errors='coerce');est=pd.to_numeric(q.estimated_woba_using_speedangle,errors='coerce');xc=wv.copy();xc.loc[est.notna()]=est.loc[est.notna()];den=wd.fillna(0).sum();return sdiv(wv.fillna(0).sum(),den),sdiv(xc.fillna(0).sum(),den)
+          def metrics(d):
+            if d.empty:return {'PITCHES':0,'PA':0,'AB':0,'BBE':0,'H':0,'XBH':0,'HR':0,'BB':0,'K':0,'OBP_PROXY':np.nan,'SLG_PROXY':np.nan,'BB_PCT':np.nan,'K_PCT':np.nan,'WHIFF_PCT':np.nan,'HARD_HIT_PCT':np.nan,'WOBA':np.nan,'XWOBA':np.nan}
+            desc=d.description.astype(str);sw=desc.isin(SW);wh=desc.isin(WH);pa=d[d.events.notna()].copy();ev=pa.events.astype(str);ab=ev.isin(HIT|{'field_out','force_out','grounded_into_double_play','field_error','fielders_choice','fielders_choice_out','strikeout','strikeout_double_play','double_play','triple_play'}).sum();h=ev.isin(HIT).sum();xbb=ev.isin(XBH).sum();hr=ev.eq('home_run').sum();bb=ev.isin(BB).sum();kk=ev.isin(K).sum();hbp=ev.eq('hit_by_pitch').sum();bbe=d[pd.to_numeric(d.launch_speed,errors='coerce').notna()];w,x=woba_x(d);tb=(ev.eq('single').sum()+2*ev.eq('double').sum()+3*ev.eq('triple').sum()+4*hr)
+            return {'PITCHES':len(d),'PA':len(pa),'AB':int(ab),'BBE':len(bbe),'H':int(h),'XBH':int(xbb),'HR':int(hr),'BB':int(bb),'K':int(kk),'OBP_PROXY':sdiv(h+bb+hbp,ab+bb+hbp),'SLG_PROXY':sdiv(tb,ab),'BB_PCT':100*sdiv(bb,len(pa)),'K_PCT':100*sdiv(kk,len(pa)),'WHIFF_PCT':100*sdiv(wh.sum(),sw.sum()),'HARD_HIT_PCT':100*sdiv((pd.to_numeric(bbe.launch_speed,errors='coerce')>=95).sum(),len(bbe)),'WOBA':w,'XWOBA':x}
+
+          # Official pregame lineup from feed; use lineup only, never result.
+          feed=getj(f'https://statsapi.mlb.com/api/v1.1/game/{GAME_PK}/feed/live');gd=feed['gameData'];ld=feed['liveData'];side='home' if int(gd['teams']['home']['id'])==TEAM_ID else 'away';opside='away' if side=='home' else 'home'
+          lrows=[]
+          for pp in ld['boxscore']['teams'][side]['players'].values():
+            bo=str(pp.get('battingOrder') or '')
+            if len(bo)==3 and bo.endswith('00'):lrows.append({'ORDER':int(bo[0]),'BATTER_ID':int(pp['person']['id']),'BATTER':pp['person']['fullName'],'POSITION':(pp.get('position') or {}).get('abbreviation','')})
+          lineup=pd.DataFrame(lrows).sort_values('ORDER').drop_duplicates('ORDER');assert len(lineup)==9
+          lineup.to_csv(OUT/'official_lineup.csv',index=False)
+
+          # As-of-date roster IDs for the 13 known active offensive profiles.
+          roster=getj(f'https://statsapi.mlb.com/api/v1/teams/{TEAM_ID}/roster',{'rosterType':'active','date':GAME_DATE}).get('roster',[])
+          rmap={norm(x['person']['fullName']):x for x in roster};active=[]
+          for nm in ACTIVE_NAMES:
+            x=rmap.get(norm(nm))
+            if not x:
+              p=getj('https://statsapi.mlb.com/api/v1/people/search',{'names':nm}).get('people',[]);assert p,nm;pid=int(p[0]['id']);pos='UNKNOWN'
+            else:pid=int(x['person']['id']);pos=(x.get('position') or {}).get('abbreviation','')
+            active.append({'BATTER':nm,'BATTER_ID':pid,'ROSTER_POSITION':pos,'ACTIVE_ROSTER':bool(x)})
+          active=pd.DataFrame(active);active.to_csv(OUT/'active13.csv',index=False);active_ids=set(active.BATTER_ID.astype(int));idname=dict(zip(active.BATTER_ID.astype(int),active.BATTER))
+
+          # Boston completed game universe through cutoff.
+          gl=getj(f'https://statsapi.mlb.com/api/v1/teams/{TEAM_ID}/stats',{'stats':'gameLog','group':'hitting','season':2026,'gameType':'R'});games=[]
+          for s in gl.get('stats',[{}])[0].get('splits',[]):
+            dt=s.get('date');pk=(s.get('game') or {}).get('gamePk')
+            if dt and pk and dt<=CUTOFF:games.append((dt,int(pk)))
+          tmp={pk:dt for dt,pk in games};games=sorted([(dt,pk) for pk,dt in tmp.items()]);assert len(games)==101;u10_games=games[-10:];u10pks={pk for dt,pk in u10_games}
+
+          # B3: exact last ten starting lineups and current-profile usage.
+          b3=[];u10_starters={bid:[] for bid in active_ids}
+          feeds={}
+          for dt,pk in u10_games:
+            f=getj(f'https://statsapi.mlb.com/api/v1.1/game/{pk}/feed/live');feeds[pk]=f;home=int(f['gameData']['teams']['home']['id'])==TEAM_ID;ts='home' if home else 'away';os='away' if home else 'home';opp_players=f['liveData']['boxscore']['teams'][os]['players'];opp_start=None
+            for pp in opp_players.values():
+              st=(pp.get('stats') or {}).get('pitching') or {}
+              if st and int(st.get('gamesStarted',0) or 0)==1:opp_start=pp;break
+            opp_hand='UNKNOWN'
+            if opp_start:
+              key='ID'+str(opp_start['person']['id']);opp_hand=((f['gameData'].get('players') or {}).get(key) or {}).get('pitchHand',{}).get('code','UNKNOWN')
+            players=f['liveData']['boxscore']['teams'][ts]['players'];starters={}
+            subs=set()
+            for pp in players.values():
+              pid=int(pp['person']['id']);bo=str(pp.get('battingOrder') or '')
+              if len(bo)==3 and bo.endswith('00'):starters[pid]=(int(bo[0]),(pp.get('position') or {}).get('abbreviation',''))
+              elif bo:subs.add(pid)
+            for bid in active_ids:
+              if bid in starters:
+                order,pos=starters[bid];status='STARTER';u10_starters[bid].append((dt,order,pos,opp_hand));reason='STARTED'
+              else:
+                order=np.nan;pos='BENCH_OR_ABSENT';status='SUB_USED' if bid in subs else 'NOT_START';reason='No public rest reason identified in official feed; no cause imputed.'
+              b3.append({'GAME_DATE':dt,'GAME_PK':pk,'BATTER_ID':bid,'BATTER':idname[bid],'STATUS':status,'ORDER':order,'POSITION':pos,'OPP_STARTER_HAND':opp_hand,'REST_REASON':reason,'SOURCE':'MLB feed/live','CUTOFF':CUTOFF})
+          b3=pd.DataFrame(b3).sort_values(['GAME_DATE','BATTER']);assert len(b3)==130;b3.to_csv(OUT/'B03_u10_lineups_long.csv',index=False)
+          b3sum=[]
+          current_order=dict(zip(lineup.BATTER_ID.astype(int),lineup.ORDER.astype(int)))
+          for bid in active.BATTER_ID.astype(int):
+            d=b3[b3.BATTER_ID==bid];st=d[d.STATUS=='STARTER'];orders=st.ORDER.dropna().astype(int).tolist();positions=st.POSITION[st.POSITION!=''].tolist();hands=st.OPP_STARTER_HAND.tolist();last7=st.sort_values('GAME_DATE');consec=0
+            for row in d.sort_values('GAME_DATE',ascending=False).itertuples():
+              if row.STATUS=='STARTER':consec+=1
+              else:break
+            mode_order=int(pd.Series(orders).mode().iloc[0]) if orders else np.nan;cur=current_order.get(bid,np.nan);chg=(cur-mode_order) if pd.notna(cur) and pd.notna(mode_order) else np.nan
+            b3sum.append({'BATTER_ID':bid,'BATTER':idname[bid],'STARTS_U10':len(st),'BENCH_OR_NOT_START':10-len(st),'SUB_USED':int((d.STATUS=='SUB_USED').sum()),'ORDERS_USED':','.join(map(str,sorted(set(orders)))) if orders else 'NONE','POSITIONS_USED':','.join(sorted(set(positions))) if positions else 'NONE','STARTS_VS_RHP':sum(h=='R' for h in hands),'STARTS_VS_LHP':sum(h=='L' for h in hands),'CONSECUTIVE_STARTS_AT_CUTOFF':consec,'MODE_ORDER_U10':mode_order,'OFFICIAL_ORDER':cur,'ORDER_CHANGE_VS_MODE':chg,'REST_REASON_POLICY':'Official feed only; unspecified managerial rests remain explicitly unknown.'})
+          b3sum=pd.DataFrame(b3sum);b3sum.to_csv(OUT/'B03_u10_usage_summary.csv',index=False)
+
+          # Fetch Savant for all 101 Boston games, then select current active 13 batting rows.
+          frames=[]
+          with ThreadPoolExecutor(max_workers=12) as ex:
+            fs=[ex.submit(sav,pk) for dt,pk in games]
+            for f in as_completed(fs):pk,d=f.result();frames.append(d)
+          z=pd.concat(frames,ignore_index=True);z['game_pk']=pd.to_numeric(z.game_pk,errors='coerce').astype('Int64');bot=z.inning_topbot.astype(str).str.lower().isin(['bot','bottom']);top=z.inning_topbot.astype(str).str.lower().eq('top');home=z.home_team.astype(str).eq('BOS');bat=z[(home&bot)|((~home)&top)].copy();bat=bat[pd.to_numeric(bat.batter,errors='coerce').isin(active_ids)].copy();bat['game_date']=pd.to_datetime(bat.game_date);bat['batter']=pd.to_numeric(bat.batter,errors='coerce').astype('Int64');bat['pitcher']=pd.to_numeric(bat.pitcher,errors='coerce').astype('Int64');bat['FAMILY']=bat.pitch_type.astype(str).map(FAM).fillna('OTHER')
+
+          # B7 complete windows for all 13 profiles.
+          b7=[]
+          for bid in active.BATTER_ID.astype(int):
+            d=bat[bat.batter==bid].sort_values(['game_date','game_pk','at_bat_number','pitch_number']);pa=d[d.events.notna()].copy();pa_keys=pa[['game_pk','at_bat_number']].drop_duplicates().values.tolist()
+            def last_n_pa(n):
+              keys=pa[['game_pk','at_bat_number']].drop_duplicates().tail(n);return d.merge(keys,on=['game_pk','at_bat_number'],how='inner')
+            windows=[('10_PA',last_n_pa(10)),('20_PA',last_n_pa(20)),('30_PA',last_n_pa(30))]
+            for days in [7,14,30]:windows.append((f'{days}_DAYS',d[d.game_date>=pd.Timestamp(CUTOFF)-pd.Timedelta(days=days-1)]))
+            windows.append(('SEASON',d));windows.append(('VS_RHP',d[d.p_throws.astype(str)=='R']));windows.append(('VS_LHP',d[d.p_throws.astype(str)=='L']))
+            for label,x in windows:
+              m=metrics(x);start=str(x.game_date.min().date()) if len(x) else 'NO_SAMPLE';end=str(x.game_date.max().date()) if len(x) else 'NO_SAMPLE';req=10 if label=='10_PA' else (20 if label=='20_PA' else (30 if label=='30_PA' else 1));suff='SUFFICIENT' if (m['PA']>=req if '_PA' in label else m['PA']>=20) else 'LIMITED'
+              b7.append({'BATTER_ID':bid,'BATTER':idname[bid],'WINDOW':label,'START_DATE':start,'END_DATE':end,'PITCHES':m['PITCHES'],'PA':m['PA'],'AB':m['AB'],'BBE':m['BBE'],'H':m['H'],'XBH':m['XBH'],'HR':m['HR'],'BB':m['BB'],'K':m['K'],'OBP_PROXY':m['OBP_PROXY'],'SLG_PROXY':m['SLG_PROXY'],'WOBA':m['WOBA'],'XWOBA':m['XWOBA'],'SAMPLE_STATUS':suff,'NOTE':'Units preserved; limited samples are labeled, never padded.'})
+            for fam in ['FASTBALL','BREAKING','OFFSPEED']:
+              x=d[d.FAMILY==fam];m=metrics(x);b7.append({'BATTER_ID':bid,'BATTER':idname[bid],'WINDOW':'FAMILY_'+fam,'START_DATE':str(x.game_date.min().date()) if len(x) else 'NO_SAMPLE','END_DATE':str(x.game_date.max().date()) if len(x) else 'NO_SAMPLE','PITCHES':m['PITCHES'],'PA':m['PA'],'AB':m['AB'],'BBE':m['BBE'],'H':m['H'],'XBH':m['XBH'],'HR':m['HR'],'BB':m['BB'],'K':m['K'],'OBP_PROXY':m['OBP_PROXY'],'SLG_PROXY':m['SLG_PROXY'],'WOBA':m['WOBA'],'XWOBA':m['XWOBA'],'SAMPLE_STATUS':'SUFFICIENT' if m['PITCHES']>=50 else 'LIMITED','NOTE':'Pitch-family window; pitch count is primary sample.'})
+          b7=pd.DataFrame(b7);assert b7.groupby('BATTER_ID').WINDOW.nunique().min()==11;b7.to_csv(OUT/'B07_windows_all13.csv',index=False)
+
+          # B20 + B6 from official dated roster, transactions and official lineup/bench role.
+          trans=getj('https://statsapi.mlb.com/api/v1/transactions',{'teamId':TEAM_ID,'startDate':'2026-07-01','endDate':GAME_DATE}).get('transactions',[])
+          tby={bid:[] for bid in active_ids}
+          for t in trans:
+            pid=((t.get('person') or {}).get('id'))
+            if pid in tby:tby[pid].append({'date':t.get('date'),'type':t.get('typeDesc'),'description':t.get('description')})
+          lineup_ids=set(lineup.BATTER_ID.astype(int));functions={'Carlos Narváez':'C2/bench catcher','Tsung-Che Cheng':'IF bench/defense/pinch-run','Romy Gonzalez':'IF/OF bench/PH vs LHP/defense','Jahmai Jones':'OF/IF bench/PH/pinch-run'}
+          b20=[];b6=[]
+          for row in active.itertuples(index=False):
+            bid=int(row.BATTER_ID);nm=row.BATTER;role=('STARTER '+str(int(lineup.loc[lineup.BATTER_ID==bid,'ORDER'].iloc[0])) if bid in lineup_ids else functions.get(nm,'BENCH'))
+            tx=tby.get(bid,[]);txtext=' | '.join([f"{x['date']} {x['type']}: {x['description']}" for x in tx]) if tx else 'No material team transaction found 2026-07-01..07-24'
+            health='Active roster as of 2026-07-24' if row.ACTIVE_ROSTER else 'Not found on dated active-roster response; requires manual review'
+            mat='MATERIAL' if tx else 'NO_MATERIAL_TRANSACTION_IDENTIFIED'
+            b20.append({'BATTER_ID':bid,'BATTER':nm,'FACT':txtext,'OWNER':'Roster/Availability + manager lineup','SOURCE':'MLB dated roster + MLB transactions + official lineup feed','PUBLICATION_OR_EVENT_TIME':'As recorded by MLB transaction/date feed','CONSULT_TIME':'V15 reconstruction','TIMEZONE':'America/New_York','EPISTEMIC':'CONFIRMED' if row.ACTIVE_ROSTER else 'REVIEW','VIGENCY':'PREGAME_SNAPSHOT','MATERIALITY':mat,'AVAILABILITY':health,'ROLE_DECISION':role,'MANAGER_DECLARATION':'No separate public declaration required/identified; lineup decision itself is official.','CONTRADICTION':'NONE','IMPACT':'Role/availability only; no pick.'})
+            b6.append({'BATTER_ID':bid,'BATTER':nm,'HAND':('L' if nm in ['Anthony Seigler','Wilyer Abreu','Masataka Yoshida','Jarren Duran','Tsung-Che Cheng'] else 'R'),'PRIMARY_POSITION':row.ROSTER_POSITION,'ROLE_CURRENT':role,'HEALTH_REFERENCE':health,'SUBSTITUTION_RISK':'LOW' if bid in lineup_ids and int(lineup.loc[lineup.BATTER_ID==bid,'ORDER'].iloc[0])<=4 else 'MEDIUM','SUBSTITUTE_OR_FUNCTION':functions.get(nm,'See official bench/position overlap'),'OFFENSIVE_FUNCTION':'Starter order/bench function documented; detailed process in B7/B10/B21.','SOURCE':'MLB dated roster + official lineup + B7/B10/B21','PRESS_SIGNAL':txtext,'PRESS_MATERIALITY':mat,'CUTOFF':'2026-07-24 pregame','VIGENCY':'PREGAME_SNAPSHOT'})
+          b20=pd.DataFrame(b20);b6=pd.DataFrame(b6);assert len(b20)==13 and len(b6)==13;b20.to_csv(OUT/'B20_health_roles_changes.csv',index=False);b6.to_csv(OUT/'B06_basic_cards.csv',index=False)
+
+          # B17 exact recent opposition + current Toronto bullpen recent workload/performance.
+          b17=[];u10_rel_outs=u10_rel_er=u10_rel_k=u10_rel_bb=0
+          for dt,pk in u10_games:
+            f=feeds[pk];home=int(f['gameData']['teams']['home']['id'])==TEAM_ID;os='away' if home else 'home';opp=f['gameData']['teams'][os];opl=f['liveData']['boxscore']['teams'][os]['players'];starter=None;rel=[]
+            for pp in opl.values():
+              st=(pp.get('stats') or {}).get('pitching') or {}
+              if not st:continue
+              if int(st.get('gamesStarted',0) or 0)==1:starter=(pp,st)
+              else:rel.append((pp,st))
+            shand='UNKNOWN';spmix='NO_STATCAST';svelo=np.nan;sid=None
+            if starter:
+              pp,st=starter;sid=int(pp['person']['id']);key='ID'+str(sid);shand=((f['gameData'].get('players') or {}).get(key) or {}).get('pitchHand',{}).get('code','UNKNOWN');zg=z[(z.game_pk==pk)&(pd.to_numeric(z.pitcher,errors='coerce')==sid)];cnt=zg.pitch_type.astype(str).value_counts();spmix='/'.join([f'{p}:{100*c/len(zg):.0f}%' for p,c in cnt.head(3).items()]) if len(zg) else 'NO_STATCAST';svelo=pd.to_numeric(zg.release_speed,errors='coerce').mean() if len(zg) else np.nan
+            ro=re=rk=rb=0
+            for pp,st in rel:
+              ro+=ip_outs(st.get('inningsPitched','0.0'));re+=int(st.get('earnedRuns',0) or 0);rk+=int(st.get('strikeOuts',0) or 0);rb+=int(st.get('baseOnBalls',0) or 0)
+            u10_rel_outs+=ro;u10_rel_er+=re;u10_rel_k+=rk;u10_rel_bb+=rb
+            b17.append({'DATE':dt,'GAME_PK':pk,'OPPONENT':opp['name'],'STARTER':starter[0]['person']['fullName'] if starter else 'UNKNOWN','STARTER_HAND':shand,'STARTER_PITCH_MIX':spmix,'STARTER_AVG_VELO':svelo,'BULLPEN_IP':outs_ip(ro),'BULLPEN_ER':re,'BULLPEN_K':rk,'BULLPEN_BB':rb,'BULLPEN_ER9':9*re/(ro/3) if ro else np.nan,'PARK':f['gameData']['venue']['name'],'COMPARABILITY_NOTE':'Observed opposition game; descriptive comparator only.'})
+          b17=pd.DataFrame(b17);b17.to_csv(OUT/'B17_recent_opposition.csv',index=False)
+          # Toronto bullpen: games Jul17-Jul23, through pregame cutoff.
+          tgl=getj(f'https://statsapi.mlb.com/api/v1/teams/{TOR_ID}/stats',{'stats':'gameLog','group':'hitting','season':2026,'gameType':'R'});tgames=[]
+          for s in tgl.get('stats',[{}])[0].get('splits',[]):
+            dt=s.get('date');pk=(s.get('game') or {}).get('gamePk')
+            if dt and pk and '2026-07-17'<=dt<=CUTOFF:tgames.append((dt,int(pk)))
+          tgames=sorted(set(tgames));to=te=tk=tb=tp=0;used23=[]
+          for dt,pk in tgames:
+            f=getj(f'https://statsapi.mlb.com/api/v1.1/game/{pk}/feed/live');hs='home' if int(f['gameData']['teams']['home']['id'])==TOR_ID else 'away'
+            for pp in f['liveData']['boxscore']['teams'][hs]['players'].values():
+              st=(pp.get('stats') or {}).get('pitching') or {}
+              if not st or int(st.get('gamesStarted',0) or 0)==1:continue
+              o=ip_outs(st.get('inningsPitched','0.0'));to+=o;te+=int(st.get('earnedRuns',0) or 0);tk+=int(st.get('strikeOuts',0) or 0);tb+=int(st.get('baseOnBalls',0) or 0);pc=int(st.get('numberOfPitches',0) or 0);tp+=pc
+              if dt==CUTOFF:used23.append({'pitcher':pp['person']['fullName'],'pitches':pc,'outs':o})
+          tor_er9=9*te/(to/3) if to else np.nan;u10_er9=9*u10_rel_er/(u10_rel_outs/3) if u10_rel_outs else np.nan;tor={'window':'2026-07-17..2026-07-23','games':len(tgames),'bullpen_ip':outs_ip(to),'ER':te,'K':tk,'BB':tb,'ER9':tor_er9,'pitches':tp,'used_on_2026-07-23':used23,'u10_opponent_bullpen_ER9':u10_er9,'comparability_delta_ER9':tor_er9-u10_er9 if pd.notna(tor_er9) and pd.notna(u10_er9) else None,'note':'Availability inferred only from recent workload; no guarantee of manager usage.'};(OUT/'B17_toronto_bullpen.json').write_text(json.dumps(tor,indent=2),encoding='utf-8')
+
+          # B22-B24 segment summaries from current official lineup + season/U10 + U10 order-change.
+          season={};u10m={}
+          for bid in lineup.BATTER_ID.astype(int):season[bid]=metrics(bat[bat.batter==bid]);u10m[bid]=metrics(bat[(bat.batter==bid)&(bat.game_pk.isin(u10pks))])
+          segdefs={'B22_TOP4':[1,2,3,4],'B23_TOP6':[1,2,3,4,5,6],'B24_6_9':[6,7,8,9]};seg=[]
+          for block,ords in segdefs.items():
+            ids=lineup[lineup.ORDER.isin(ords)].BATTER_ID.astype(int).tolist();ms=[season[x] for x in ids];mu=[u10m[x] for x in ids];pa=sum(x['PA'] for x in ms);upa=sum(x['PA'] for x in mu);hr=sum(x['HR'] for x in ms);xbh=sum(x['XBH'] for x in ms);bb=sum(x['BB'] for x in ms);kk=sum(x['K'] for x in ms);w=np.nanmean([x['WOBA'] for x in ms]);xw=np.nanmean([x['XWOBA'] for x in ms]);uw=np.nanmean([x['WOBA'] for x in mu]);orders_change=[]
+            for bid in ids:
+              r=b3sum[b3sum.BATTER_ID==bid].iloc[0];orders_change.append(f"{idname[bid]}:{r.MODE_ORDER_U10}->{r.OFFICIAL_ORDER}")
+            strength='traffic/power balanced' if pa and (100*bb/pa>=7 and 100*xbh/pa>=7) else ('power-led' if pa and 100*xbh/pa>=7 else 'contact/traffic limited')
+            vuln='K concentration' if pa and 100*kk/pa>=25 else ('HR dependence' if xbh and hr/xbh>=.65 else 'no single dominant aggregate vulnerability')
+            seg.append({'BLOCK':block,'ORDERS':','.join(map(str,ords)),'BATTERS':' | '.join(lineup[lineup.ORDER.isin(ords)].sort_values('ORDER').BATTER.tolist()),'SEASON_PA':pa,'BB_PCT':100*sdiv(bb,pa),'K_PCT':100*sdiv(kk,pa),'XBH_PCT':100*sdiv(xbh,pa),'HR_PCT':100*sdiv(hr,pa),'HR_SHARE_XBH':sdiv(hr,xbh),'MEAN_WOBA':w,'MEAN_XWOBA':xw,'U10_PA':upa,'U10_MEAN_WOBA':uw,'ORDER_CHANGES_VS_U10':' | '.join(orders_change),'STRENGTH':strength,'VULNERABILITY':vuln,'MATCHUP':'Use B18 individual matrix; no pick.','SAMPLE':'Season + U10 explicitly separated.'})
+          seg=pd.DataFrame(seg);seg.to_csv(OUT/'B22_B24_segments.csv',index=False)
+
+          # B25 bench scenarios with season platoon data, marked inferential where manager decision is unknown.
+          scenarios={'Carlos Narváez':('C2/bench catcher','Connor Wong','late C / defense or rest','No handedness change guaranteed'), 'Tsung-Che Cheng':('IF bench/defense/pinch-run','Andruw Monasterio or Anthony Seigler','late defense/pinch-run','L bat may replace R bat'), 'Romy Gonzalez':('IF/OF bench/PH vs LHP/defense','left-handed starter as matchup dictates','PH vs LHP reliever / defense','R bat for L bat'), 'Jahmai Jones':('OF/IF bench/PH/pinch-run','OF/DH as game state dictates','pinch-run/PH/defense','R bat for L bat possible')}
+          b25=[]
+          for nm,(fun,target,situ,handchg) in scenarios.items():
+            bid=int(active.loc[active.BATTER==nm,'BATTER_ID'].iloc[0]);mr=metrics(bat[(bat.batter==bid)&(bat.p_throws.astype(str)=='R')]);ml=metrics(bat[(bat.batter==bid)&(bat.p_throws.astype(str)=='L')]);b25.append({'BATTER_ID':bid,'BATTER':nm,'FUNCTION':fun,'HAND':'L' if nm=='Tsung-Che Cheng' else 'R','POSITIONS':active.loc[active.BATTER==nm,'ROSTER_POSITION'].iloc[0],'WOBA_VS_RHP':mr['WOBA'],'PA_VS_RHP':mr['PA'],'WOBA_VS_LHP':ml['WOBA'],'PA_VS_LHP':ml['PA'],'POSSIBLE_TARGET':target,'ENTRY_SCENARIO':situ,'HAND_CHANGE':handchg,'EXPECTED_OFFENSE_DELTA':'Not asserted without actual substitution; compare platoon wOBA only if scenario occurs.','PR_ROLE':'YES' if nm in ['Tsung-Che Cheng','Jahmai Jones'] else 'NO','DEF_ROLE':'YES','SOURCE':'MLB roster + Statcast season + official lineup','VIGENCY':'PREGAME','NOTE':'Scenario is inferential, not a manager commitment.'})
+          b25=pd.DataFrame(b25);b25.to_csv(OUT/'B25_bench_scenarios.csv',index=False)
+
+          # B26 consolidated no-pick diagnostic.
+          b18=pd.read_csv('runtime/bos_v14_granular/B18_matchup_matrix.csv');top=seg[seg.BLOCK=='B22_TOP4'].iloc[0];six=seg[seg.BLOCK=='B23_TOP6'].iloc[0];low=seg[seg.BLOCK=='B24_6_9'].iloc[0]
+          diag={'lineup_state':'OFFICIAL MLB; B4 projection N/A','individual_cards':'13/13 B6 + B7/B10/B21','matchup_matrix':'B18 9/9, V14 preserved','segments':seg.to_dict('records'),'bench':'4/4 scenarios documented','material_advantages':['official lineup fixed','secondary-pitch matchup quantified','all mandatory windows explicit'],'material_weaknesses':['small BvP samples','some bench/player windows limited','Toronto bullpen availability remains workload-based, not guaranteed'],'primary_offensive_route':'Elevate counts, avoid chase on Yesavage splitter/slider, exploit individual damage zones documented in B14 and rotate traffic through top six.','neutralization_route':'Yesavage gets ahead and converts splitter/slider whiffs; Toronto bridges to rested relievers; bottom segment fails to reconnect to top four.','strongest_segment':'Top 4' if top.MEAN_WOBA>=max(six.MEAN_WOBA,low.MEAN_WOBA) else 'Top 6','most_vulnerable_segment':'6-9' if low.MEAN_WOBA<=min(top.MEAN_WOBA,six.MEAN_WOBA) else 'See segment matrix','diagnosis_changers':['scratch/lineup change','starter change','material roster/health news','unexpected bullpen unavailability'],'contradictions':[],'missing_applicable_blocks':[],'reopen_conditions':['lineup or starter changes','material health/roster news','source contradiction'],'version':'BOS-20260724-V15-INTEGRITY','frozen_candidate':True,'pick':'PROHIBITED'};(OUT/'B26_diagnostic.json').write_text(json.dumps(diag,indent=2),encoding='utf-8')
+
+          qa={'cutoff':CUTOFF,'game_pk':GAME_PK,'pregame_games':len(games),'B03_rows':len(b3),'B03_players':b3.BATTER_ID.nunique(),'B06_rows':len(b6),'B07_rows':len(b7),'B07_players':b7.BATTER_ID.nunique(),'B07_windows_min':int(b7.groupby('BATTER_ID').WINDOW.nunique().min()),'B17_rows':len(b17),'B20_rows':len(b20),'B22_B24_rows':len(seg),'B25_rows':len(b25),'B26_present':(OUT/'B26_diagnostic.json').exists(),'V14_QA':json.loads(Path('runtime/bos_v14_granular/qa_final.json').read_text())['status'],'status':'PASS'}
+          assert qa['B03_rows']==130 and qa['B03_players']==13 and qa['B06_rows']==13 and qa['B07_players']==13 and qa['B07_windows_min']>=11 and qa['B17_rows']==10 and qa['B20_rows']==13 and qa['B22_B24_rows']==3 and qa['B25_rows']==4 and qa['V14_QA']=='PASS'
+          (OUT/'qa_v15.json').write_text(json.dumps(qa,indent=2),encoding='utf-8')
+          md=['# BOS V15 — Integrity close','',f"QA: **{qa['status']}**",'', 'Reopened blocks reconstructed: B3, B6, B7, B17, B20, B22-B26. V14 granular closure remains authoritative for B11/B13-B15/B18/B19. All performance data are pregame through 2026-07-23; Game 824733 result/events are excluded.','', '## QA',pd.DataFrame([qa]).to_markdown(index=False),'','## Segment matrix',seg.to_markdown(index=False),'','## Toronto bullpen comparator','```json',json.dumps(tor,indent=2),'```','', 'No pick or JRC verdict is emitted.']
+          (OUT/'BOS_V15_INTEGRITY.md').write_text('\n'.join(md),encoding='utf-8')
+          print(json.dumps(qa,indent=2));print(seg.to_string(index=False));print(json.dumps(tor,indent=2))
+          PY
+      - name: Commit V15 outputs
+        if: always()
+        run: |
+          git config user.name 'mlb-research-bot'
+          git config user.email 'mlb-research-bot@users.noreply.github.com'
+          git add runtime/bos_v15_integrity || true
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'BOS V15: contractual integrity outputs'; git push; fi
